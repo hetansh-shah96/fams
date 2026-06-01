@@ -4,24 +4,27 @@ import bcrypt from "bcryptjs";
 
 export async function GET() {
   try {
-    const user = await prisma.user.findUnique({ where: { email: "admin@fams.com" } });
-    if (!user) return NextResponse.json({ error: "User not found" });
+    // Simulate exactly what authorize() does
+    const email = "admin@fams.com";
+    const password = "Admin@123";
 
-    const testPassword = "Admin@123";
-    const asyncCompare = await bcrypt.compare(testPassword, user.password);
-    const syncCompare = bcrypt.compareSync(testPassword, user.password);
-    const freshHash = await bcrypt.hash(testPassword, 12);
-    const freshCompare = await bcrypt.compare(testPassword, freshHash);
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) return NextResponse.json({ step: "FAIL", reason: "user not found" });
+    if (!user.isActive) return NextResponse.json({ step: "FAIL", reason: "user inactive" });
+
+    const valid = await bcrypt.compare(password, user.password);
 
     return NextResponse.json({
-      userFound: true,
-      hashPrefix: user.password.substring(0, 10) + "...",
-      hashLength: user.password.length,
-      asyncCompare,
-      syncCompare,
-      freshHashWorks: freshCompare,
+      step: valid ? "PASS" : "FAIL",
+      reason: valid ? "credentials match" : "bcrypt compare returned false",
+      userId: user.id,
+      isActive: user.isActive,
+      hashPrefix: user.password.substring(0, 7),
     });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ step: "ERROR", error: String(err) }, { status: 500 });
   }
 }

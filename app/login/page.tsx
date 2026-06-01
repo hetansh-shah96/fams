@@ -21,19 +21,25 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const res = await signIn("credentials", {
+        email: email.trim(),
+        password,
+        redirect: false,
+      });
 
-    setLoading(false);
+      setLoading(false);
 
-    if (res?.error) {
+      // NextAuth v5: check both error field and ok field
+      if (!res || res.error || res.ok === false) {
+        setError("Invalid email or password");
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch {
+      setLoading(false);
       setError("Invalid email or password");
-    } else {
-      router.push("/dashboard");
-      router.refresh();
     }
   }
 
@@ -62,7 +68,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@company.com"
+                    placeholder="admin@fams.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-9"
