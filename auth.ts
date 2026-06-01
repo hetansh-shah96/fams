@@ -14,26 +14,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        try {
+          if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-          include: { location: true, department: true },
-        });
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email as string },
+          });
 
-        if (!user || !user.isActive) return null;
+          if (!user || !user.isActive) return null;
 
-        const valid = await bcrypt.compare(credentials.password as string, user.password);
-        if (!valid) return null;
+          const valid = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          );
+          if (!valid) return null;
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          locationId: user.locationId,
-          departmentId: user.departmentId,
-        };
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            locationId: user.locationId,
+            departmentId: user.departmentId,
+          };
+        } catch (error) {
+          console.error("[auth] authorize error:", error);
+          return null;
+        }
       },
     }),
   ],
@@ -59,6 +66,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   session: { strategy: "jwt" },
 });

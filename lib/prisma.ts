@@ -9,6 +9,11 @@ function createPrismaClient() {
     max: 5,
     idleTimeoutMillis: 10000,
     connectionTimeoutMillis: 5000,
+    ssl: connectionString?.includes("railway.internal")
+      ? false
+      : connectionString?.includes("localhost")
+      ? false
+      : { rejectUnauthorized: false },
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({
