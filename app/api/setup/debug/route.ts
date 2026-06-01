@@ -8,8 +8,8 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "User not found" });
 
     const testPassword = "Admin@123";
-    const compareResult = await bcrypt.compare(testPassword, user.password);
-    const compareSync = bcrypt.compareSync(testPassword, user.password);
+    const asyncCompare = await bcrypt.compare(testPassword, user.password);
+    const syncCompare = bcrypt.compareSync(testPassword, user.password);
     const freshHash = await bcrypt.hash(testPassword, 12);
     const freshCompare = await bcrypt.compare(testPassword, freshHash);
 
@@ -17,10 +17,9 @@ export async function GET() {
       userFound: true,
       hashPrefix: user.password.substring(0, 10) + "...",
       hashLength: user.password.length,
-      asyncCompare: compareResult,
-      syncCompare: compareSync,
+      asyncCompare,
+      syncCompare,
       freshHashWorks: freshCompare,
-      bcryptjsVersion: require("bcryptjs/package.json").version,
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
