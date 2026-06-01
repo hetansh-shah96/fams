@@ -1,0 +1,365 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  BRANCH_MANAGER
+  DEPT_HEAD
+  EMPLOYEE
+}
+
+enum AssetStatus {
+  PROCURED
+  IN_TRANSIT
+  ACTIVE
+  IN_REPAIR
+  IDLE
+  RETIRED
+  DISPOSED
+}
+
+enum DepreciationMethod {
+  SLM
+  WDV
+}
+
+enum AllocationStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+enum ServiceType {
+  AMC_VISIT
+  BREAKDOWN_REPAIR
+  SCHEDULED_SERVICE
+  INSURANCE_RENEWAL
+  PUC_RENEWAL
+  WARRANTY_CLAIM
+  OTHER
+}
+
+enum AuditSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum AuditEntryStatus {
+  VERIFIED
+  MISSING
+  MISPLACED
+  EXCESS
+}
+
+enum AlertType {
+  AMC_EXPIRY
+  INSURANCE_EXPIRY
+  PUC_EXPIRY
+  WARRANTY_EXPIRY
+  SCHEDULED_SERVICE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  password     String
+  role         Role     @default(EMPLOYEE)
+  locationId   String?
+  departmentId String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  location   Location?   @relation("UserLocation", fields: [locationId], references: [id])
+  department Department? @relation("UserDepartment", fields: [departmentId], references: [id])
+
+  assignedAssets         Asset[]              @relation("AssignedUser")
+  createdAssets          Asset[]              @relation("AssetCreator")
+  transferredBy          AssetAllocation[]    @relation("TransferredBy")
+  allocationsToUser      AssetAllocation[]    @relation("AllocationToUser")
+  allocationsFromUser    AssetAllocation[]    @relation("AllocationFromUser")
+  depreciationRuns       DepreciationRecord[]
+  maintenanceLogs        MaintenanceLog[]
+  auditSessionsConducted AuditSession[]
+  auditEntries           AuditEntry[]
+  auditLogs              AuditLog[]
+  deptHeadOf             Department[]         @relation("DeptHead")
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  address   String?
+  city      String?
+  state     String?
+  pincode   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  users                User[]            @relation("UserLocation")
+  departments          Department[]
+  assetsAtLocation     Asset[]           @relation("CurrentLocation")
+  fromAllocations      AssetAllocation[] @relation("FromLocation")
+  toAllocations        AssetAllocation[] @relation("ToLocation")
+  auditSessions        AuditSession[]
+  expectedAuditEntries AuditEntry[]      @relation("ExpectedLocation")
+  foundAuditEntries    AuditEntry[]      @relation("FoundLocation")
+}
+
+model Department {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  locationId String
+  headUserId String?
+  remark     String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  location        Location          @relation(fields: [locationId], references: [id])
+  headUser        User?             @relation("DeptHead", fields: [headUserId], references: [id])
+  users           User[]            @relation("UserDepartment")
+  assetsInDept    Asset[]           @relation("CurrentDepartment")
+  fromAllocations AssetAllocation[] @relation("FromDepartment")
+  toAllocations   AssetAllocation[] @relation("ToDepartment")
+}
+
+model AssetCategory {
+  id                     String             @id @default(cuid())
+  code                   String             @unique
+  name                   String
+  usefulLifeCompaniesAct Int                @default(5)
+  itActBlockRate         Float              @default(0.15)
+  depreciationMethod     DepreciationMethod @default(SLM)
+  assetClassDescription  String?
+  isActive               Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+
+  assets Asset[]
+}
+
+model Asset {
+  id                  String      @id @default(cuid())
+  assetCode           String      @unique
+  assetTagNumber      String?     @unique
+  name                String
+  make                String?
+  model               String?
+  serialNumber        String?
+  categoryId          String
+  purchaseDate        DateTime
+  purchaseCost        Decimal     @db.Decimal(15, 2)
+  gstPaid             Decimal     @default(0) @db.Decimal(15, 2)
+  invoiceNumber       String?
+  residualValue       Decimal     @db.Decimal(15, 2)
+  status              AssetStatus @default(PROCURED)
+  currentLocationId   String
+  currentDepartmentId String
+  assignedUserId      String?
+  description         String?
+  imageUrl            String?
+  invoiceDocUrl       String?
+  warrantyExpiry      DateTime?
+  insuranceExpiry     DateTime?
+  pucExpiry           DateTime?
+  ipConfiguration     String?
+  serverModel         String?
+  condition           String?     @default("NEW")
+  supplierId          String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  createdByUserId     String
+
+  category          AssetCategory      @relation(fields: [categoryId], references: [id])
+  currentLocation   Location           @relation("CurrentLocation", fields: [currentLocationId], references: [id])
+  currentDepartment Department         @relation("CurrentDepartment", fields: [currentDepartmentId], references: [id])
+  assignedUser      User?              @relation("AssignedUser", fields: [assignedUserId], references: [id])
+  createdBy         User               @relation("AssetCreator", fields: [createdByUserId], references: [id])
+  supplier          Supplier?          @relation(fields: [supplierId], references: [id])
+  allocations       AssetAllocation[]
+  depreciation      DepreciationRecord[]
+  maintenance       MaintenanceLog[]
+  auditEntries      AuditEntry[]
+}
+
+model Supplier {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  address1      String?
+  address2      String?
+  address3      String?
+  contactPerson String?
+  email         String?
+  contactNo     String?
+  city          String?
+  state         String?
+  country       String?
+  pincode       String?
+  phoneNo       String?
+  panNo         String?
+  gstNo         String?
+  supplierType  String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  assets Asset[]
+}
+
+model AssetAllocation {
+  id                   String           @id @default(cuid())
+  assetId              String
+  fromLocationId       String?
+  toLocationId         String
+  fromDepartmentId     String?
+  toDepartmentId       String
+  fromUserId           String?
+  toUserId             String?
+  transferDate         DateTime
+  returnDate           DateTime?
+  transferredByUserId  String
+  receiverAcknowledged Boolean          @default(false)
+  notes                String?
+  status               AllocationStatus @default(PENDING)
+  createdAt            DateTime         @default(now())
+
+  asset          Asset       @relation(fields: [assetId], references: [id])
+  fromLocation   Location?   @relation("FromLocation", fields: [fromLocationId], references: [id])
+  toLocation     Location    @relation("ToLocation", fields: [toLocationId], references: [id])
+  fromDepartment Department? @relation("FromDepartment", fields: [fromDepartmentId], references: [id])
+  toDepartment   Department  @relation("ToDepartment", fields: [toDepartmentId], references: [id])
+  fromUser       User?       @relation("AllocationFromUser", fields: [fromUserId], references: [id])
+  toUser         User?       @relation("AllocationToUser", fields: [toUserId], references: [id])
+  transferredBy  User        @relation("TransferredBy", fields: [transferredByUserId], references: [id])
+}
+
+model DepreciationRecord {
+  id                        String   @id @default(cuid())
+  assetId                   String
+  financialYear             String
+  openingWDV                Decimal  @db.Decimal(15, 2)
+  companiesActDepreciation  Decimal  @db.Decimal(15, 2)
+  companiesActClosingWDV    Decimal  @db.Decimal(15, 2)
+  itActDepreciation         Decimal  @db.Decimal(15, 2)
+  itActClosingWDV           Decimal  @db.Decimal(15, 2)
+  putToUseDays              Int
+  halfYearRule              Boolean  @default(false)
+  calculatedAt              DateTime @default(now())
+  calculatedByUserId        String
+
+  asset        Asset @relation(fields: [assetId], references: [id])
+  calculatedBy User  @relation(fields: [calculatedByUserId], references: [id])
+
+  @@unique([assetId, financialYear])
+}
+
+model MaintenanceLog {
+  id              String      @id @default(cuid())
+  assetId         String
+  serviceType     ServiceType
+  vendorName      String?
+  vendorContact   String?
+  serviceDate     DateTime
+  nextDueDate     DateTime?
+  cost            Decimal     @default(0) @db.Decimal(15, 2)
+  invoiceDocUrl   String?
+  odometer        Int?
+  clickCount      Int?
+  remarks         String?
+  resolvedAt      DateTime?
+  createdByUserId String
+  createdAt       DateTime    @default(now())
+
+  asset     Asset @relation(fields: [assetId], references: [id])
+  createdBy User  @relation(fields: [createdByUserId], references: [id])
+}
+
+model AuditSession {
+  id                String             @id @default(cuid())
+  name              String
+  locationId        String
+  conductedByUserId String
+  startDate         DateTime           @default(now())
+  endDate           DateTime?
+  status            AuditSessionStatus @default(IN_PROGRESS)
+  totalAssets       Int                @default(0)
+  verified          Int                @default(0)
+  missing           Int                @default(0)
+  misplaced         Int                @default(0)
+  createdAt         DateTime           @default(now())
+
+  location    Location     @relation(fields: [locationId], references: [id])
+  conductedBy User         @relation(fields: [conductedByUserId], references: [id])
+  entries     AuditEntry[]
+}
+
+model AuditEntry {
+  id                 String           @id @default(cuid())
+  auditSessionId     String
+  assetId            String
+  expectedLocationId String
+  foundLocationId    String?
+  status             AuditEntryStatus @default(MISSING)
+  scannedAt          DateTime?
+  scannedByUserId    String
+  notes              String?
+
+  auditSession     AuditSession @relation(fields: [auditSessionId], references: [id])
+  asset            Asset        @relation(fields: [assetId], references: [id])
+  expectedLocation Location     @relation("ExpectedLocation", fields: [expectedLocationId], references: [id])
+  foundLocation    Location?    @relation("FoundLocation", fields: [foundLocationId], references: [id])
+  scannedBy        User         @relation(fields: [scannedByUserId], references: [id])
+}
+
+model AlertConfig {
+  id              String    @id @default(cuid())
+  type            AlertType @unique
+  daysBeforeAlert Int       @default(15)
+  isActive        Boolean   @default(true)
+  notifyEmails    String[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String
+  oldValues  Json?
+  newValues  Json?
+  timestamp  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  address1  String?
+  address2  String?
+  address3  String?
+  email     String?
+  city      String?
+  state     String?
+  country   String?
+  pincode   String?
+  phoneNo   String?
+  panNo     String?
+  gstNo     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
