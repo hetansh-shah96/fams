@@ -6,6 +6,7 @@ import { Role } from "@prisma/client";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "fams-dev-secret-change-in-production",
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {

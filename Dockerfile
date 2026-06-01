@@ -16,5 +16,6 @@ RUN npm run build
 EXPOSE 8080
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV AUTH_TRUST_HOST=true
 
 CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
