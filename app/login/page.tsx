@@ -30,8 +30,8 @@ export default function LoginPage() {
 
       setLoading(false);
 
-      // NextAuth v5: check both error field and ok field
-      if (!res || res.error || res.ok === false) {
+      // NextAuth v5: returns undefined on success, object with error on failure
+      if (res?.error) {
         setError("Invalid email or password");
       } else {
         router.push("/dashboard");
