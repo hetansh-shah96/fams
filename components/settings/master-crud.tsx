@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 
 export interface FieldDef {
   key: string;
@@ -24,26 +24,26 @@ interface Props<T extends Record<string, unknown>> {
   onRefresh: () => void;
   canCreate?: boolean;
   canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 export function MasterCrud<T extends Record<string, unknown>>({
-  title, items, fields, apiPath, onRefresh, canCreate = true, canEdit = true,
+  title, items, fields, apiPath, onRefresh,
+  canCreate = true, canEdit = true, canDelete = true,
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  function openCreate() {
-    setEditing(null);
-    setForm({});
-    setOpen(true);
-  }
+  function openCreate() { setEditing(null); setForm({}); setOpen(true); }
 
   function openEdit(item: T) {
     setEditing(item);
     const f: Record<string, string> = {};
-    fields.forEach((field) => { f[field.key] = String(item[field.key] ?? ""); });
+    fields.forEach(field => { f[field.key] = String(item[field.key] ?? ""); });
     setForm(f);
     setOpen(true);
   }
@@ -52,7 +52,7 @@ export function MasterCrud<T extends Record<string, unknown>>({
     setLoading(true);
     try {
       const payload: Record<string, unknown> = {};
-      fields.forEach((field) => {
+      fields.forEach(field => {
         payload[field.key] = field.type === "number" ? Number(form[field.key]) : form[field.key];
       });
       if (editing) payload.id = editing.id;
@@ -68,9 +68,25 @@ export function MasterCrud<T extends Record<string, unknown>>({
       onRefresh();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
+  }
+
+  async function handleDelete(id: string) {
+    setDeleting(true);
+    try {
+      const res = await fetch(apiPath, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete");
+      toast.success("Deleted successfully");
+      setConfirmId(null);
+      onRefresh();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error");
+    } finally { setDeleting(false); }
   }
 
   return (
@@ -91,10 +107,10 @@ export function MasterCrud<T extends Record<string, unknown>>({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b">
-              {fields.map((f) => (
+              {fields.map(f => (
                 <th key={f.key} className="text-left px-4 py-3 font-semibold text-gray-600">{f.label}</th>
               ))}
-              {canEdit && <th className="px-4 py-3" />}
+              {(canEdit || canDelete) && <th className="px-4 py-3 w-28" />}
             </tr>
           </thead>
           <tbody>
@@ -103,14 +119,48 @@ export function MasterCrud<T extends Record<string, unknown>>({
             ) : (
               items.map((item, i) => (
                 <tr key={String(item.id ?? i)} className={`border-b last:border-0 hover:bg-orange-50 ${i % 2 === 1 ? "bg-amber-50/30" : ""}`}>
-                  {fields.map((f) => (
+                  {fields.map(f => (
                     <td key={f.key} className="px-4 py-3 text-gray-700">{String(item[f.key] ?? "—")}</td>
                   ))}
-                  {canEdit && (
+                  {(canEdit || canDelete) && (
                     <td className="px-4 py-3">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
+                      {confirmId === String(item.id) ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-500 mr-1">Delete?</span>
+                          <Button
+                            variant="destructive" size="sm"
+                            className="h-6 text-xs px-2"
+                            disabled={deleting}
+                            onClick={() => handleDelete(String(item.id))}
+                          >
+                            {deleting ? "…" : "Yes"}
+                          </Button>
+                          <Button
+                            variant="outline" size="sm"
+                            className="h-6 text-xs px-2"
+                            onClick={() => setConfirmId(null)}
+                          >
+                            No
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          {canEdit && (
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost" size="sm"
+                              className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => setConfirmId(String(item.id))}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   )}
                 </tr>
@@ -126,13 +176,13 @@ export function MasterCrud<T extends Record<string, unknown>>({
             <DialogTitle>{editing ? `Edit ${title}` : `New ${title}`}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {fields.map((field) => (
+            {fields.map(field => (
               <div key={field.key} className="space-y-1.5">
                 <Label>{field.label}{field.required && " *"}</Label>
                 <Input
                   type={field.type ?? "text"}
                   value={form[field.key] ?? ""}
-                  onChange={(e) => setForm((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                  onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
                 />
               </div>
             ))}
@@ -140,7 +190,7 @@ export function MasterCrud<T extends Record<string, unknown>>({
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={loading} className="bg-orange-500 hover:bg-orange-600">
-              {loading ? "Saving..." : "Save"}
+              {loading ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

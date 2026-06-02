@@ -70,6 +70,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       pucExpiry: body.pucExpiry ? new Date(body.pucExpiry) : null,
       condition: body.condition,
       ipConfiguration: body.ipConfiguration,
+      ...(body.customValues !== undefined ? { customValues: body.customValues } : {}),
+      ...(body.assignedToType ? { assignedToType: body.assignedToType } : {}),
     },
   });
 

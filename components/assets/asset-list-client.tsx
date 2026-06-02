@@ -136,7 +136,7 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
           <SelectContent>
             <SelectItem value="ALL">All Categories</SelectItem>
             {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -148,7 +148,7 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
             <SelectContent>
               <SelectItem value="ALL">All Locations</SelectItem>
               {locations.map((l) => (
-                <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                <SelectItem key={l.id} value={l.id} label={l.name}>{l.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

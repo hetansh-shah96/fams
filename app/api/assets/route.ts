@@ -28,6 +28,8 @@ const createSchema = z.object({
   ipConfiguration: z.string().optional(),
   serverModel: z.string().optional(),
   condition: z.string().optional(),
+  customValues: z.record(z.string(), z.string()).nullish(),
+  assignedToType: z.enum(["USER", "OFFICE"]).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -73,6 +75,8 @@ export async function POST(req: NextRequest) {
       ipConfiguration: data.ipConfiguration,
       serverModel: data.serverModel,
       condition: data.condition ?? "NEW",
+      ...(data.customValues ? { customValues: data.customValues } : {}),
+      assignedToType: (data.assignedToType ?? "OFFICE") as never,
       createdByUserId: session.user.id,
     },
   });

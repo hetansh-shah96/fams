@@ -18,13 +18,24 @@ export default function QRScannerPage() {
 
   async function lookupAsset(code: string) {
     if (!code.trim()) return;
+    setError("");
+    // If the QR encodes a full URL (e.g. https://domain/assets/ID), navigate directly
+    try {
+      const url = new URL(code.trim());
+      if (url.origin === window.location.origin) {
+        router.push(url.pathname);
+        return;
+      }
+    } catch {
+      // Not a URL — fall through to asset code search
+    }
     const res = await fetch(`/api/assets?search=${encodeURIComponent(code.trim())}`);
-    if (!res.ok) { setError("Asset not found"); return; }
+    if (!res.ok) { setError("Lookup failed — please try again"); return; }
     const data = await res.json();
     if (data.assets?.length > 0) {
       router.push(`/assets/${data.assets[0].id}`);
     } else {
-      setError(`No asset found for code: ${code}`);
+      setError(`No asset found for: ${code}`);
     }
   }
 

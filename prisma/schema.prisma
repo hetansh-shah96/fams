@@ -28,6 +28,11 @@ enum DepreciationMethod {
   WDV
 }
 
+enum AssignedToType {
+  USER
+  OFFICE
+}
+
 enum AllocationStatus {
   PENDING
   COMPLETED
@@ -100,9 +105,11 @@ model Location {
   city      String?
   state     String?
   pincode   String?
+  companyId String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
+  company              Company?          @relation(fields: [companyId], references: [id])
   users                User[]            @relation("UserLocation")
   departments          Department[]
   assetsAtLocation     Asset[]           @relation("CurrentLocation")
@@ -135,10 +142,14 @@ model AssetCategory {
   id                     String             @id @default(cuid())
   code                   String             @unique
   name                   String
+  group                  String?
+  itActBlock             String?
   usefulLifeCompaniesAct Int                @default(5)
   itActBlockRate         Float              @default(0.15)
   depreciationMethod     DepreciationMethod @default(SLM)
   assetClassDescription  String?
+  isIntangible           Boolean            @default(false)
+  customFields           Json?
   isActive               Boolean            @default(true)
   createdAt              DateTime           @default(now())
 
@@ -163,6 +174,7 @@ model Asset {
   currentLocationId   String
   currentDepartmentId String
   assignedUserId      String?
+  assignedToType      AssignedToType @default(OFFICE)
   description         String?
   imageUrl            String?
   invoiceDocUrl       String?
@@ -172,6 +184,7 @@ model Asset {
   ipConfiguration     String?
   serverModel         String?
   condition           String?     @default("NEW")
+  customValues        Json?
   supplierId          String?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
@@ -362,4 +375,6 @@ model Company {
   gstNo     String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  locations Location[]
 }

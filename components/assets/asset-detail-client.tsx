@@ -41,8 +41,9 @@ interface Asset {
   ipConfiguration: string | null;
   description: string | null;
   createdAt: string;
-  category: { name: string };
+  category: { name: string; group: string | null; customFields: { key: string; label: string }[] | null };
   currentLocation: { name: string };
+  customValues: Record<string, string> | null;
   currentDepartment: { name: string };
   assignedUser: { name: string; email: string } | null;
   supplier: { name: string } | null;
@@ -120,7 +121,7 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
       {showQR && (
         <Card className="max-w-xs">
           <CardContent className="pt-4 flex flex-col items-center gap-3">
-            <QRCodeDisplay value={asset.assetCode} size={160} />
+            <QRCodeDisplay assetId={asset.id} assetCode={asset.assetCode} size={160} />
             <p className="text-xs font-mono text-gray-600">{asset.assetCode}</p>
             <Button variant="outline" size="sm" className="w-full" onClick={() => window.print()}>
               <Download className="w-4 h-4 mr-2" />Print Label
@@ -181,6 +182,10 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
                   <InfoRow label="Serial Number" value={asset.serialNumber} />
                   <InfoRow label="Tag Number" value={asset.assetTagNumber} />
                   <InfoRow label="IP Configuration" value={asset.ipConfiguration} />
+                  {/* Category-specific custom field values */}
+                  {asset.category.customFields?.map(f => (
+                    <InfoRow key={f.key} label={f.label} value={asset.customValues?.[f.key] || null} />
+                  ))}
                   <InfoRow label="Warranty Expiry" value={asset.warrantyExpiry ? format(new Date(asset.warrantyExpiry), "dd MMM yyyy") : null} />
                   <InfoRow label="Insurance Expiry" value={asset.insuranceExpiry ? format(new Date(asset.insuranceExpiry), "dd MMM yyyy") : null} />
                   <InfoRow label="PUC Expiry" value={asset.pucExpiry ? format(new Date(asset.pucExpiry), "dd MMM yyyy") : null} />

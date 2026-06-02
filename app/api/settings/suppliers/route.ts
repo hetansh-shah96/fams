@@ -19,6 +19,27 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(supplier, { status: 201 });
 }
 
+export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  if (!session || session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+  try {
+    const { id } = await req.json();
+    const assetCount = await prisma.asset.count({ where: { supplierId: id } });
+    if (assetCount > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete — ${assetCount} asset${assetCount > 1 ? "s are" : " is"} linked to this supplier.` },
+        { status: 409 }
+      );
+    }
+    await prisma.supplier.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
+  }
+}
+
 export async function PUT(req: NextRequest) {
   const session = await auth();
   if (!session || !["SUPER_ADMIN", "BRANCH_MANAGER"].includes(session.user.role)) {

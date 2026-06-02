@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectDisplay, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Plus, ClipboardCheck } from "lucide-react";
@@ -139,10 +139,14 @@ export function AuditClient({ sessions, locations, userId, role }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>Location *</Label>
-              <Select onValueChange={(v: string | null) => v && setLocationId(v)}>
-                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+              <Select value={locationId} onValueChange={(v: string | null) => { if (v) setLocationId(v); }}>
+                <SelectTrigger>
+                  <SelectDisplay value={locationId} placeholder="Select location">
+                    {locations.find(l => l.id === locationId)?.name}
+                  </SelectDisplay>
+                </SelectTrigger>
                 <SelectContent>
-                  {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                  {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

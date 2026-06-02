@@ -187,9 +187,35 @@ function SelectScrollDownButton({
   )
 }
 
+// Renders the selected item's display name without relying on SelectPrimitive.Value,
+// which shows the raw value (ID) in @base-ui/react before items are mounted.
+function SelectDisplay({
+  value,
+  placeholder,
+  children,
+}: {
+  value: string | null | undefined;
+  placeholder?: string;
+  children?: React.ReactNode;
+}) {
+  if (value) {
+    return (
+      <span className="flex flex-1 text-left text-sm truncate">
+        {children ?? value}
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-1 text-left text-sm truncate text-muted-foreground">
+      {placeholder ?? "Select…"}
+    </span>
+  );
+}
+
 export {
   Select,
   SelectContent,
+  SelectDisplay,
   SelectGroup,
   SelectItem,
   SelectLabel,

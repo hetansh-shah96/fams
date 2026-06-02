@@ -29,6 +29,31 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(dept, { status: 201 });
 }
 
+export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  if (!session || session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+  try {
+    const { id } = await req.json();
+    const counts = await prisma.department.findUnique({
+      where: { id },
+      select: { _count: { select: { assetsInDept: true, users: true } } },
+    });
+    const total = (counts?._count.assetsInDept ?? 0) + (counts?._count.users ?? 0);
+    if (total > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete — ${counts!._count.assetsInDept} assets and ${counts!._count.users} users are linked to this department.` },
+        { status: 409 }
+      );
+    }
+    await prisma.department.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
+  }
+}
+
 export async function PUT(req: NextRequest) {
   const session = await auth();
   if (!session || !["SUPER_ADMIN", "BRANCH_MANAGER"].includes(session.user.role)) {

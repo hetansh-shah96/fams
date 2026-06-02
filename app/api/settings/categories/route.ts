@@ -19,13 +19,38 @@ export async function POST(req: NextRequest) {
     data: {
       code: body.code,
       name: body.name,
+      group: body.group ?? null,
+      itActBlock: body.itActBlock ?? null,
       usefulLifeCompaniesAct: body.usefulLifeCompaniesAct ?? 5,
       itActBlockRate: body.itActBlockRate ?? 0.15,
       depreciationMethod: body.depreciationMethod ?? "SLM",
-      assetClassDescription: body.assetClassDescription,
+      assetClassDescription: body.assetClassDescription ?? null,
+      isIntangible: body.isIntangible ?? false,
+      customFields: body.customFields ?? null,
     },
   });
   return NextResponse.json(cat, { status: 201 });
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  if (!session || session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+  try {
+    const { id } = await req.json();
+    const assetCount = await prisma.asset.count({ where: { categoryId: id } });
+    if (assetCount > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete — ${assetCount} asset${assetCount > 1 ? "s use" : " uses"} this category.` },
+        { status: 409 }
+      );
+    }
+    await prisma.assetCategory.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
+  }
 }
 
 export async function PUT(req: NextRequest) {

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectDisplay, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
@@ -79,10 +79,14 @@ export function MaintenanceForm({ assets, defaultAssetId }: Props) {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label>Asset *</Label>
-              <Select onValueChange={(v: string | null) => v && setAssetId(v)} defaultValue={defaultAssetId}>
-                <SelectTrigger><SelectValue placeholder="Select asset" /></SelectTrigger>
+              <Select value={assetId} onValueChange={(v: string | null) => { if (v) setAssetId(v); }}>
+                <SelectTrigger>
+                  <SelectDisplay value={assetId} placeholder="Select asset">
+                    {(() => { const a = assets.find(a => a.id === assetId); return a ? `${a.name} (${a.assetCode})` : undefined; })()}
+                  </SelectDisplay>
+                </SelectTrigger>
                 <SelectContent>
-                  {assets.map((a) => <SelectItem key={a.id} value={a.id}>{a.name} ({a.assetCode})</SelectItem>)}
+                  {assets.map(a => <SelectItem key={a.id} value={a.id}>{a.name} ({a.assetCode})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -90,10 +94,14 @@ export function MaintenanceForm({ assets, defaultAssetId }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Service Type *</Label>
-                <Select onValueChange={(v: string | null) => v && setServiceType(v)}>
-                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                <Select value={serviceType} onValueChange={(v: string | null) => { if (v) setServiceType(v); }}>
+                  <SelectTrigger>
+                    <SelectDisplay value={serviceType} placeholder="Select type">
+                      {serviceType ? serviceType.replace(/_/g, " ") : undefined}
+                    </SelectDisplay>
+                  </SelectTrigger>
                   <SelectContent>
-                    {SERVICE_TYPES.map((t) => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
+                    {SERVICE_TYPES.map(t => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

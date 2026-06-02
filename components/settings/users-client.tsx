@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectDisplay, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil } from "lucide-react";
@@ -156,27 +156,37 @@ export function UsersClient({ users: initialUsers, locations, departments, isSup
             <div className="space-y-1.5">
               <Label>Role *</Label>
               <Select value={form.role} onValueChange={(v: string | null) => v && setForm((p) => ({ ...p, role: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectDisplay value={form.role}>{form.role?.replace(/_/g, " ")}</SelectDisplay>
+                </SelectTrigger>
                 <SelectContent>
-                  {ROLES.map((r) => <SelectItem key={r} value={r}>{r.replace(/_/g, " ")}</SelectItem>)}
+                  {ROLES.map(r => <SelectItem key={r} value={r}>{r.replace(/_/g, " ")}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Location</Label>
               <Select value={form.locationId} onValueChange={(v: string | null) => v && setForm((p) => ({ ...p, locationId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectDisplay value={form.locationId} placeholder="Select location">
+                    {locations.find(l => l.id === form.locationId)?.name}
+                  </SelectDisplay>
+                </SelectTrigger>
                 <SelectContent>
-                  {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                  {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Department</Label>
               <Select value={form.departmentId} onValueChange={(v: string | null) => v && setForm((p) => ({ ...p, departmentId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectDisplay value={form.departmentId} placeholder="Select department">
+                    {departments.find(d => d.id === form.departmentId)?.name}
+                  </SelectDisplay>
+                </SelectTrigger>
                 <SelectContent>
-                  {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

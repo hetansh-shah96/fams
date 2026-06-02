@@ -66,11 +66,10 @@ const navItems = [
     label: "Settings",
     icon: Settings,
     children: [
-      { href: "/settings/locations", label: "Locations" },
+      { href: "/settings/company", label: "Companies & Branches" },
       { href: "/settings/departments", label: "Departments" },
       { href: "/settings/categories", label: "Asset Categories" },
       { href: "/settings/suppliers", label: "Suppliers" },
-      { href: "/settings/company", label: "Company" },
       { href: "/settings/users", label: "Users" },
       { href: "/settings/alerts", label: "Alert Config" },
       { href: "/settings/audit-log", label: "Audit Log" },
@@ -91,7 +90,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-60 bg-gray-900 text-gray-100 flex flex-col min-h-screen fixed left-0 top-0 z-30">
+    <aside className="w-60 bg-gray-900 text-gray-100 flex flex-col h-screen fixed left-0 top-0 z-30 overflow-hidden">
       <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-700">
         <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
           <Building2 className="w-5 h-5 text-white" />
