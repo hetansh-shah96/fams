@@ -277,9 +277,8 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
 
             <TabsContent value="depreciation">
               <div className="space-y-3">
-                {/* Rate info + Run button */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-3 text-xs">
                     <span className="bg-orange-50 border border-orange-100 rounded px-2.5 py-1 text-orange-700 font-medium">
                       CA: {asset.category.usefulLifeCompaniesAct} yrs {asset.category.depreciationMethod} · {(100 / asset.category.usefulLifeCompaniesAct).toFixed(2)}% p.a.
                     </span>
@@ -296,69 +295,76 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
                   </Link>
                 </div>
 
-                {/* Companies Act table */}
-                <div className="rounded-lg border overflow-hidden">
-                  <div className="bg-orange-50 border-b px-3 py-1.5 text-xs text-orange-700 font-medium">
-                    Companies Act 2013 (SLM) — {asset.category.usefulLifeCompaniesAct} yr useful life · {(100 / asset.category.usefulLifeCompaniesAct).toFixed(2)}% per annum
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs min-w-[500px]">
-                      <thead>
-                        <tr className="bg-gray-50 border-b">
-                          <th className="text-left px-3 py-2 font-semibold text-gray-500">FY</th>
-                          <th className="text-right px-3 py-2 font-semibold text-gray-500">Opening WDV</th>
-                          <th className="text-right px-3 py-2 font-semibold text-gray-500">Depreciation</th>
-                          <th className="text-right px-3 py-2 font-semibold text-gray-500">Closing WDV</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {asset.depreciation.length === 0 ? (
-                          <tr><td colSpan={4} className="text-center py-6 text-gray-400">No records — click Run Depreciation</td></tr>
-                        ) : asset.depreciation.map((d, i) => (
-                          <tr key={d.id} className={`border-b last:border-0 hover:bg-orange-50 ${i % 2 === 1 ? "bg-amber-50/30" : ""}`}>
-                            <td className="px-3 py-2 font-semibold text-gray-700">{d.financialYear}</td>
-                            <td className="px-3 py-2 text-right">₹{Number(d.openingWDV).toLocaleString("en-IN")}</td>
-                            <td className="px-3 py-2 text-right text-red-600 font-medium">₹{Number(d.companiesActDepreciation).toLocaleString("en-IN")}</td>
-                            <td className="px-3 py-2 text-right font-medium">₹{Number(d.companiesActClosingWDV).toLocaleString("en-IN")}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <Tabs defaultValue="ca">
+                  <TabsList variant="line">
+                    <TabsTrigger value="ca" className="text-xs px-3 py-1.5">
+                      Companies Act (SLM)
+                    </TabsTrigger>
+                    {asset.itActBlock && (
+                      <TabsTrigger value="it" className="text-xs px-3 py-1.5">
+                        Income Tax Act (WDV)
+                      </TabsTrigger>
+                    )}
+                  </TabsList>
 
-                {/* IT Act table */}
-                {asset.itActBlock && (
-                  <div className="rounded-lg border overflow-hidden">
-                    <div className="bg-blue-50 border-b px-3 py-1.5 text-xs text-blue-700 font-medium">
-                      Income Tax Act (WDV) — Block: {asset.itActBlock.name.replace(/^\d+%\s*[—–-]\s*/, "")} · {(asset.itActBlock.rate * 100).toFixed(0)}% full year / {(asset.itActBlock.rate * 50).toFixed(0)}% half year
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs min-w-[500px]">
-                        <thead>
-                          <tr className="bg-gray-50 border-b">
-                            <th className="text-left px-3 py-2 font-semibold text-gray-500">FY</th>
-                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Opening WDV</th>
-                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Depreciation</th>
-                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Closing WDV</th>
-                            <th className="text-center px-3 py-2 font-semibold text-gray-500">½yr</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {asset.depreciation.map((d, i) => (
-                            <tr key={d.id} className={`border-b last:border-0 hover:bg-blue-50 ${i % 2 === 1 ? "bg-blue-50/20" : ""}`}>
-                              <td className="px-3 py-2 font-semibold text-gray-700">{d.financialYear}</td>
-                              <td className="px-3 py-2 text-right">₹{Number(d.openingWDV).toLocaleString("en-IN")}</td>
-                              <td className="px-3 py-2 text-right text-red-600 font-medium">₹{Number(d.itActDepreciation).toLocaleString("en-IN")}</td>
-                              <td className="px-3 py-2 text-right font-medium">₹{Number(d.itActClosingWDV).toLocaleString("en-IN")}</td>
-                              <td className="px-3 py-2 text-center text-gray-400">{d.halfYearRule ? "✓" : "—"}</td>
+                  <TabsContent value="ca">
+                    {asset.depreciation.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-8">No records — click Run Depreciation</p>
+                    ) : (
+                      <div className="overflow-x-auto border rounded-lg mt-2">
+                        <table className="w-full text-xs min-w-[440px]">
+                          <thead>
+                            <tr className="bg-gray-50 border-b">
+                              <th className="text-left px-4 py-2.5 font-semibold text-gray-500">FY</th>
+                              <th className="text-right px-4 py-2.5 font-semibold text-gray-500">Opening WDV</th>
+                              <th className="text-right px-4 py-2.5 font-semibold text-gray-500">Depreciation</th>
+                              <th className="text-right px-4 py-2.5 font-semibold text-gray-500">Closing WDV</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+                          </thead>
+                          <tbody>
+                            {asset.depreciation.map((d, i) => (
+                              <tr key={d.id} className={`border-b last:border-0 hover:bg-orange-50 ${i % 2 === 1 ? "bg-amber-50/30" : ""}`}>
+                                <td className="px-4 py-2.5 font-semibold text-gray-700">{d.financialYear}</td>
+                                <td className="px-4 py-2.5 text-right">₹{Number(d.openingWDV).toLocaleString("en-IN")}</td>
+                                <td className="px-4 py-2.5 text-right text-red-600 font-medium">₹{Number(d.companiesActDepreciation).toLocaleString("en-IN")}</td>
+                                <td className="px-4 py-2.5 text-right font-medium">₹{Number(d.companiesActClosingWDV).toLocaleString("en-IN")}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  {asset.itActBlock && (
+                    <TabsContent value="it">
+                      <div className="overflow-x-auto border rounded-lg mt-2">
+                        <table className="w-full text-xs min-w-[480px]">
+                          <thead>
+                            <tr className="bg-gray-50 border-b">
+                              <th className="text-left px-4 py-2.5 font-semibold text-gray-500">FY</th>
+                              <th className="text-right px-4 py-2.5 font-semibold text-gray-500">Opening WDV</th>
+                              <th className="text-right px-4 py-2.5 font-semibold text-gray-500">Depreciation</th>
+                              <th className="text-right px-4 py-2.5 font-semibold text-gray-500">Closing WDV</th>
+                              <th className="text-center px-4 py-2.5 font-semibold text-gray-500">½yr</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {asset.depreciation.map((d, i) => (
+                              <tr key={d.id} className={`border-b last:border-0 hover:bg-blue-50 ${i % 2 === 1 ? "bg-blue-50/20" : ""}`}>
+                                <td className="px-4 py-2.5 font-semibold text-gray-700">{d.financialYear}</td>
+                                <td className="px-4 py-2.5 text-right">₹{Number(d.openingWDV).toLocaleString("en-IN")}</td>
+                                <td className="px-4 py-2.5 text-right text-red-600 font-medium">₹{Number(d.itActDepreciation).toLocaleString("en-IN")}</td>
+                                <td className="px-4 py-2.5 text-right font-medium">₹{Number(d.itActClosingWDV).toLocaleString("en-IN")}</td>
+                                <td className="px-4 py-2.5 text-center text-gray-400">{d.halfYearRule ? "✓" : "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </TabsContent>
+                  )}
+                </Tabs>
               </div>
             </TabsContent>
           </Tabs>
