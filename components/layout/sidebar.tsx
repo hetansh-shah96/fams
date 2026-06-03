@@ -68,7 +68,8 @@ const navItems = [
     children: [
       { href: "/settings/company", label: "Companies & Branches" },
       { href: "/settings/departments", label: "Departments" },
-      { href: "/settings/categories", label: "Asset Categories" },
+      { href: "/settings/categories", label: "CA Categories" },
+      { href: "/settings/it-act-blocks", label: "IT Act Blocks" },
       { href: "/settings/suppliers", label: "Suppliers" },
       { href: "/settings/users", label: "Users" },
       { href: "/settings/alerts", label: "Alert Config" },

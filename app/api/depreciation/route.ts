@@ -13,6 +13,12 @@ export async function POST(req: NextRequest) {
   const { financialYear, assetIds } = await req.json();
   if (!financialYear) return NextResponse.json({ error: "Financial year required" }, { status: 400 });
 
+  // Verify session user exists in DB (stale sessions after DB reset would fail FK constraint)
+  const sessionUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!sessionUser) {
+    return NextResponse.json({ error: "Session expired — please log out and log back in." }, { status: 401 });
+  }
+
   const assets = await prisma.asset.findMany({
     where: assetIds?.length ? { id: { in: assetIds } } : { status: { not: "DISPOSED" } },
     include: { category: true, itActBlock: true },
