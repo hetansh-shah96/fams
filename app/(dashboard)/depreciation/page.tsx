@@ -38,7 +38,15 @@ export default async function DepreciationPage({
     prisma.assetCategory.findMany({ orderBy: { name: "asc" } }),
   ]);
 
-  const fyList = getIndianFYList();
+  // Start FY list from the year the earliest asset was purchased
+  const earliestPurchase = assets.reduce<Date | null>((min, a) => {
+    const d = new Date(a.purchaseDate);
+    return !min || d < min ? d : min;
+  }, null);
+  const earliestStartYear = earliestPurchase
+    ? (earliestPurchase.getMonth() >= 3 ? earliestPurchase.getFullYear() : earliestPurchase.getFullYear() - 1)
+    : 2015;
+  const fyList = getIndianFYList(earliestStartYear);
 
   return (
     <DepreciationClient

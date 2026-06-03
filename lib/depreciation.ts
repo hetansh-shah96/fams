@@ -67,6 +67,31 @@ export function calculateDepreciation(input: DepreciationInput): DepreciationRes
   };
 }
 
+export function getNextFY(fy: string): string {
+  const [startYear] = fy.split("-").map(Number);
+  const next = startYear + 1;
+  return `${next}-${String(next + 1).slice(2)}`;
+}
+
+export function getPreviousFY(fy: string): string {
+  const [startYear] = fy.split("-").map(Number);
+  const prev = startYear - 1;
+  return `${prev}-${String(prev + 1).slice(2)}`;
+}
+
+export function getAssetFirstFY(purchaseDate: Date): string {
+  const year = purchaseDate.getFullYear();
+  const month = purchaseDate.getMonth(); // 0-indexed; April = 3
+  if (month >= 3) return `${year}-${String(year + 1).slice(2)}`;
+  return `${year - 1}-${String(year).slice(2)}`;
+}
+
+export function compareFY(fy1: string, fy2: string): number {
+  const [y1] = fy1.split("-").map(Number);
+  const [y2] = fy2.split("-").map(Number);
+  return y1 - y2;
+}
+
 export function getCurrentIndianFY(): string {
   const now = new Date();
   const year = now.getFullYear();

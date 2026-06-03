@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calculator, Play } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Play, CheckCircle2, Info, X } from "lucide-react";
 
 interface Asset {
   id: string;
@@ -14,10 +14,11 @@ interface Asset {
   name: string;
   purchaseCost: string;
   residualValue: string;
+  purchaseDate: string;
   category: { name: string };
 }
 
-interface Record {
+interface DepreciationRecord {
   id: string;
   financialYear: string;
   openingWDV: string;
@@ -29,22 +30,31 @@ interface Record {
   asset: { assetCode: string; name: string };
 }
 
+interface RunResult {
+  fy: string;
+  processed: number;
+  priorYearsAutoFilled: number;
+  notApplicable: number;
+}
+
 interface Props {
   assets: Asset[];
-  records: Record[];
+  records: DepreciationRecord[];
   categories: { id: string; name: string }[];
   fyList: string[];
   selectedFY: string;
   defaultAssetId?: string;
 }
 
-export function DepreciationClient({ assets, records, categories, fyList, selectedFY, defaultAssetId }: Props) {
+export function DepreciationClient({ assets, records, categories, fyList, selectedFY }: Props) {
   const router = useRouter();
   const [fy, setFY] = useState(selectedFY);
   const [running, setRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<RunResult | null>(null);
 
   async function runDepreciation() {
     setRunning(true);
+    setLastRun(null);
     try {
       const res = await fetch("/api/depreciation", {
         method: "POST",
@@ -53,7 +63,20 @@ export function DepreciationClient({ assets, records, categories, fyList, select
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      toast.success(`Depreciation calculated for ${data.processed} assets (FY ${fy})`);
+
+      setLastRun({
+        fy,
+        processed: data.processed,
+        priorYearsAutoFilled: data.priorYearsAutoFilled ?? 0,
+        notApplicable: data.notApplicable ?? 0,
+      });
+
+      if (data.processed > 0) {
+        toast.success(`FY ${fy}: calculated for ${data.processed} asset${data.processed !== 1 ? "s" : ""}`);
+      } else if (data.notApplicable > 0 && data.processed === 0) {
+        toast.info(`No assets were active in FY ${fy}`);
+      }
+
       router.refresh();
     } catch {
       toast.error("Failed to run depreciation");
@@ -73,15 +96,28 @@ export function DepreciationClient({ assets, records, categories, fyList, select
     { openingWDV: 0, companiesActDep: 0, companiesActWDV: 0, itActDep: 0, itActWDV: 0 }
   );
 
+  // Figure out the earliest FY any active asset can be depreciated in
+  const earliestFY = assets.reduce<string | null>((min, a) => {
+    const d = new Date(a.purchaseDate);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const firstFY = month >= 3 ? `${year}-${String(year + 1).slice(2)}` : `${year - 1}-${String(year).slice(2)}`;
+    if (!min) return firstFY;
+    return firstFY < min ? firstFY : min;
+  }, null);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Depreciation</h1>
-          <p className="text-sm text-gray-500">Companies Act (SLM) &amp; IT Act (WDV) depreciation engine</p>
+          <p className="text-sm text-gray-500">
+            Companies Act 2013 (SLM) &amp; IT Act (WDV) — select target FY and run once
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={fy} onValueChange={(v: string | null) => { if (v) { setFY(v); router.push(`/depreciation?fy=${v}`); } }}>
+          <Select value={fy} onValueChange={(v: string | null) => { if (v) { setFY(v); setLastRun(null); router.push(`/depreciation?fy=${v}`); } }}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
@@ -91,13 +127,48 @@ export function DepreciationClient({ assets, records, categories, fyList, select
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={runDepreciation} disabled={running} className="bg-orange-500 hover:bg-orange-600">
+          <Button onClick={runDepreciation} disabled={running} className="bg-orange-500 hover:bg-orange-600 whitespace-nowrap">
             <Play className="w-4 h-4 mr-2" />
             {running ? "Running..." : `Run FY ${fy}`}
           </Button>
         </div>
       </div>
 
+      {/* Run result panel */}
+      {lastRun && (
+        <div className="rounded-xl border bg-white overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+            <p className="text-sm font-semibold text-gray-700">Run result — FY {lastRun.fy}</p>
+            <button onClick={() => setLastRun(null)} className="text-gray-400 hover:text-gray-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-4 space-y-3">
+            {lastRun.processed > 0 && (
+              <div className="flex items-start gap-2 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2.5">
+                <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  <strong>{lastRun.processed} asset{lastRun.processed !== 1 ? "s" : ""}</strong> calculated for FY {lastRun.fy}.
+                  {lastRun.priorYearsAutoFilled > 0 && (
+                    <span className="text-green-600"> ({lastRun.priorYearsAutoFilled} missing prior-year record{lastRun.priorYearsAutoFilled !== 1 ? "s" : ""} auto-filled to get here.)</span>
+                  )}
+                </span>
+              </div>
+            )}
+
+            {lastRun.processed === 0 && lastRun.notApplicable > 0 && (
+              <div className="flex items-start gap-2 text-sm text-blue-700 bg-blue-50 rounded-lg px-3 py-2.5">
+                <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  All {lastRun.notApplicable} asset{lastRun.notApplicable !== 1 ? "s" : ""} were purchased after FY {lastRun.fy} — nothing to calculate for this year.
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Summary KPI cards */}
       {records.length > 0 && (
         <div className="grid grid-cols-5 gap-4">
           {[
@@ -119,8 +190,10 @@ export function DepreciationClient({ assets, records, categories, fyList, select
         </div>
       )}
 
+      {/* Records table */}
       <div className="bg-white rounded-xl border overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="bg-gray-50 border-b">
               <th className="text-left px-4 py-3 font-semibold text-gray-600">Asset</th>
@@ -136,8 +209,15 @@ export function DepreciationClient({ assets, records, categories, fyList, select
           <tbody>
             {records.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-gray-400">
-                  No depreciation records for FY {fy}. Click "Run" to calculate.
+                <td colSpan={8} className="py-14 text-center">
+                  <p className="text-gray-400 mb-1">No depreciation records for FY {fy}.</p>
+                  {!lastRun && (
+                    <p className="text-xs text-gray-400">
+                      {earliestFY
+                        ? `Earliest eligible FY for your assets is ${earliestFY}. Run years in order from there.`
+                        : `Click "Run FY ${fy}" to calculate.`}
+                    </p>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -147,7 +227,9 @@ export function DepreciationClient({ assets, records, categories, fyList, select
                     <p className="font-medium">{r.asset.name}</p>
                     <p className="text-xs font-mono text-blue-700">{r.asset.assetCode}</p>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{assets.find(a => a.assetCode === r.asset.assetCode)?.category.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {assets.find(a => a.assetCode === r.asset.assetCode)?.category.name ?? "—"}
+                  </td>
                   <td className="px-4 py-3 text-right">₹{Number(r.openingWDV).toLocaleString("en-IN")}</td>
                   <td className="px-4 py-3 text-right text-red-600">₹{Number(r.companiesActDepreciation).toLocaleString("en-IN")}</td>
                   <td className="px-4 py-3 text-right">₹{Number(r.companiesActClosingWDV).toLocaleString("en-IN")}</td>
@@ -172,6 +254,7 @@ export function DepreciationClient({ assets, records, categories, fyList, select
             </tfoot>
           )}
         </table>
+        </div>
       </div>
     </div>
   );

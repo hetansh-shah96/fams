@@ -80,13 +80,13 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Assets</h1>
           <p className="text-sm text-gray-500">{total} total assets</p>
         </div>
         {canWrite && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link href="/assets/qr-scanner">
               <Button variant="outline" size="sm">
                 <QrCode className="w-4 h-4 mr-2" />
@@ -158,7 +158,7 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
       {/* Table */}
       <div className="bg-white rounded-xl border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b">
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Asset Code</th>

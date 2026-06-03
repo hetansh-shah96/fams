@@ -12,10 +12,10 @@ import {
   FileBarChart,
   Settings,
   Building2,
-  QrCode,
   Bell,
   ChevronDown,
   ChevronRight,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -77,7 +77,12 @@ const navItems = [
   },
 ];
 
-export function Sidebar() {
+interface Props {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
@@ -90,15 +95,33 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-60 bg-gray-900 text-gray-100 flex flex-col h-screen fixed left-0 top-0 z-30 overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-700">
-        <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
-          <Building2 className="w-5 h-5 text-white" />
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-40 h-screen w-60 bg-gray-900 text-gray-100 flex flex-col overflow-hidden",
+        "transition-transform duration-200 ease-in-out",
+        // Mobile: slide in/out. Desktop (lg+): always visible
+        "lg:translate-x-0",
+        open ? "translate-x-0" : "-translate-x-full"
+      )}
+    >
+      {/* Logo + mobile close button */}
+      <div className="flex items-center justify-between px-5 py-5 border-b border-gray-700">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-sm text-white">FAMS</p>
+            <p className="text-xs text-gray-400">Asset Management</p>
+          </div>
         </div>
-        <div>
-          <p className="font-bold text-sm text-white">FAMS</p>
-          <p className="text-xs text-gray-400">Asset Management</p>
-        </div>
+        <button
+          onClick={onClose}
+          className="lg:hidden p-1 rounded text-gray-400 hover:text-white"
+          aria-label="Close menu"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       <nav className="flex-1 py-4 overflow-y-auto">
@@ -109,6 +132,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href!}
+                onClick={onClose}
                 className={cn(
                   "flex items-center gap-3 px-5 py-2.5 text-sm transition-colors",
                   active
@@ -138,11 +162,7 @@ export function Sidebar() {
                   <item.icon className="w-4 h-4 flex-shrink-0" />
                   {item.label}
                 </span>
-                {groupOpen ? (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5" />
-                )}
+                {groupOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
               </button>
               {groupOpen && (
                 <div className="bg-gray-950">
@@ -152,6 +172,7 @@ export function Sidebar() {
                       <Link
                         key={child.href}
                         href={child.href}
+                        onClick={onClose}
                         className={cn(
                           "flex items-center pl-12 pr-5 py-2 text-sm transition-colors",
                           childActive
@@ -173,6 +194,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-gray-700">
         <Link
           href="/notifications"
+          onClick={onClose}
           className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors"
         >
           <Bell className="w-4 h-4" />
