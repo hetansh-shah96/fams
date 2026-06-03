@@ -53,22 +53,22 @@ export async function POST(req: NextRequest) {
   const laptopCat = await prisma.assetCategory.upsert({
     where: { code: "IT" },
     update: {},
-    create: { code: "IT", name: "Laptops & Computers", usefulLifeCompaniesAct: 3, itActBlockRate: 0.40, depreciationMethod: DepreciationMethod.WDV, assetClassDescription: "Computers & Peripherals" },
+    create: { code: "IT", name: "Laptops & Computers", usefulLifeCompaniesAct: 3, depreciationMethod: DepreciationMethod.WDV, assetClassDescription: "Computers & Peripherals" },
   });
   const furnitureCat = await prisma.assetCategory.upsert({
     where: { code: "FURN" },
     update: {},
-    create: { code: "FURN", name: "Furniture & Fixtures", usefulLifeCompaniesAct: 10, itActBlockRate: 0.10, depreciationMethod: DepreciationMethod.SLM },
+    create: { code: "FURN", name: "Furniture & Fixtures", usefulLifeCompaniesAct: 10, depreciationMethod: DepreciationMethod.SLM },
   });
   const vehicleCat = await prisma.assetCategory.upsert({
     where: { code: "VEH" },
     update: {},
-    create: { code: "VEH", name: "Vehicles", usefulLifeCompaniesAct: 8, itActBlockRate: 0.15, depreciationMethod: DepreciationMethod.WDV },
+    create: { code: "VEH", name: "Vehicles", usefulLifeCompaniesAct: 8, depreciationMethod: DepreciationMethod.WDV },
   });
   const officeCat = await prisma.assetCategory.upsert({
     where: { code: "OFF" },
     update: {},
-    create: { code: "OFF", name: "Office Equipment", usefulLifeCompaniesAct: 5, itActBlockRate: 0.15, depreciationMethod: DepreciationMethod.SLM },
+    create: { code: "OFF", name: "Office Equipment", usefulLifeCompaniesAct: 5, depreciationMethod: DepreciationMethod.SLM },
   });
 
   const admin = await prisma.user.create({

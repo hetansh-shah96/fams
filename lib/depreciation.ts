@@ -5,7 +5,7 @@ export interface DepreciationInput {
   residualValue: number;
   purchaseDate: Date;
   usefulLifeCompaniesAct: number;
-  itActBlockRate: number;
+  itActRate: number;
   depreciationMethod: DepreciationMethod;
   financialYear: string; // e.g. "2024-25"
   openingWDV?: number;
@@ -35,7 +35,7 @@ function getDaysBetween(a: Date, b: Date): number {
 }
 
 export function calculateDepreciation(input: DepreciationInput): DepreciationResult {
-  const { purchaseCost, residualValue, purchaseDate, usefulLifeCompaniesAct, itActBlockRate, financialYear } = input;
+  const { purchaseCost, residualValue, purchaseDate, usefulLifeCompaniesAct, itActRate: itActBlockRate, financialYear } = input;
   const fy = getFYDates(financialYear);
   const openingWDV = input.openingWDV ?? purchaseCost;
 

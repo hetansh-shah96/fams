@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   const assets = await prisma.asset.findMany({
     where: assetIds?.length ? { id: { in: assetIds } } : { status: { not: "DISPOSED" } },
-    include: { category: true },
+    include: { category: true, itActBlock: true },
   });
 
   let processedTarget = 0;
@@ -24,14 +24,13 @@ export async function POST(req: NextRequest) {
 
   for (const asset of assets) {
     const assetFirstFY = getAssetFirstFY(new Date(asset.purchaseDate));
+    const itActRate = asset.itActBlock?.rate ?? 0;
 
-    // Asset not yet purchased in the target FY — skip entirely
     if (compareFY(financialYear, assetFirstFY) < 0) {
       notApplicable.push({ assetCode: asset.assetCode, name: asset.name });
       continue;
     }
 
-    // Walk every year from the asset's first FY up to the target FY, filling gaps
     let currentFY = assetFirstFY;
     let openingWDV = Number(asset.purchaseCost);
 
@@ -41,19 +40,17 @@ export async function POST(req: NextRequest) {
       });
 
       if (existing && compareFY(currentFY, financialYear) < 0) {
-        // Prior year already calculated — use its closing WDV and move on
         openingWDV = Number(existing.companiesActClosingWDV);
         currentFY = getNextFY(currentFY);
         continue;
       }
 
-      // Calculate this year (either a gap year or the target year)
       const result = calculateDepreciation({
         purchaseCost: Number(asset.purchaseCost),
         residualValue: Number(asset.residualValue),
         purchaseDate: new Date(asset.purchaseDate),
         usefulLifeCompaniesAct: asset.category.usefulLifeCompaniesAct,
-        itActBlockRate: asset.category.itActBlockRate,
+        itActRate,
         depreciationMethod: asset.category.depreciationMethod,
         financialYear: currentFY,
         openingWDV,
@@ -62,8 +59,7 @@ export async function POST(req: NextRequest) {
       await prisma.depreciationRecord.upsert({
         where: { assetId_financialYear: { assetId: asset.id, financialYear: currentFY } },
         create: {
-          assetId: asset.id,
-          financialYear: currentFY,
+          assetId: asset.id, financialYear: currentFY,
           openingWDV: result.openingWDV,
           companiesActDepreciation: result.companiesActDepreciation,
           companiesActClosingWDV: result.companiesActClosingWDV,
@@ -98,10 +94,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({
-    processed: processedTarget,
-    priorYearsAutoFilled,
-    notApplicable: notApplicable.length,
-    financialYear,
-  });
+  return NextResponse.json({ processed: processedTarget, priorYearsAutoFilled, notApplicable: notApplicable.length, financialYear });
 }

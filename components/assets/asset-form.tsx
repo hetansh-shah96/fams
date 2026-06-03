@@ -56,21 +56,27 @@ interface CategoryOption {
   name: string;
   code: string;
   group: string | null;
-  itActBlock: string | null;
   usefulLifeCompaniesAct: number;
-  itActBlockRate: number;
   depreciationMethod: string;
   isIntangible: boolean;
   customFields: unknown;
 }
 
+interface ItActBlockOption {
+  id: string;
+  code: string;
+  name: string;
+  rate: number;
+}
+
 interface Props {
   categories: CategoryOption[];
+  itActBlocks: ItActBlockOption[];
   locations: { id: string; name: string }[];
   departments: { id: string; name: string; locationId: string; location: { name: string } }[];
   suppliers: { id: string; name: string }[];
   users: { id: string; name: string; email: string }[];
-  asset?: Partial<FormData> & { id?: string; customValues?: Record<string, string>; assignedToType?: string };
+  asset?: Partial<FormData> & { id?: string; customValues?: Record<string, string>; assignedToType?: string; itActBlockId?: string };
 }
 
 const TABS = ["basic", "classification", "financial", "location", "compliance"] as const;
@@ -92,7 +98,7 @@ const TAB_FIELDS: Record<Tab, (keyof FormData)[]> = {
   compliance: [],
 };
 
-export function AssetForm({ categories, locations, departments, suppliers, users, asset }: Props) {
+export function AssetForm({ categories, itActBlocks, locations, departments, suppliers, users, asset }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("basic");
@@ -111,6 +117,7 @@ export function AssetForm({ categories, locations, departments, suppliers, users
   const [assignedToType, setAssignedToType] = useState<"OFFICE" | "USER">(
     (asset?.assignedToType as "OFFICE" | "USER") ?? "OFFICE"
   );
+  const [selectedItBlockId, setSelectedItBlockId] = useState(asset?.itActBlockId ?? "");
   const [selectedStatus, setSelectedStatus] = useState(asset?.status ?? "ACTIVE");
   const [selectedCondition, setSelectedCondition] = useState(asset?.condition ?? "NEW");
   const [customValues, setCustomValues] = useState<Record<string, string>>(asset?.customValues ?? {});
@@ -167,6 +174,7 @@ export function AssetForm({ categories, locations, departments, suppliers, users
           customValues,
           assignedToType,
           assignedUserId: assignedToType === "USER" ? data.assignedUserId : null,
+          itActBlockId: selectedItBlockId || null,
         }),
       });
       if (!res.ok) {
@@ -281,157 +289,133 @@ export function AssetForm({ categories, locations, departments, suppliers, users
 
               {/* ── Tab 2: Classification ── */}
               <TabsContent value="classification" className="p-6">
-                <p className="text-xs text-gray-400 mb-4">
-                  Select the asset class under <strong>Companies Act 2013 (Schedule II)</strong> and review the corresponding <strong>Income Tax Act block rate</strong>.
+                <p className="text-xs text-gray-400 mb-5">
+                  Select the asset classification under <strong>two separate frameworks</strong>: Companies Act 2013 (for SLM depreciation) and Income Tax Act (for WDV block depreciation).
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Step 1: CA Group */}
-                  <div className="space-y-1.5">
-                    <Label>Companies Act — Asset Group <span className="text-red-500">*</span></Label>
-                    <Select
-                      value={selectedGroup}
-                      onValueChange={(v: string | null) => {
-                        if (v) {
-                          setSelectedGroup(v);
-                          setSelectedCategoryId("");
-                          setValue("categoryId", "");
-                          setCustomValues({});
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectDisplay value={selectedGroup} placeholder="Select asset group">
-                          {selectedGroup}
-                        </SelectDisplay>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {caGroups.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-gray-400">Broad classification per Schedule II of Companies Act 2013</p>
-                  </div>
 
-                  {/* Step 2: Specific sub-category */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label>Asset Sub-type <span className="text-red-500">*</span></Label>
-                      <a href="/settings/categories" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-600 hover:underline">
-                        <ExternalLink className="w-3 h-3" />Manage
-                      </a>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* ── LEFT: Companies Act 2013 ── */}
+                  <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-5 space-y-4">
+                    <div>
+                      <p className="text-xs font-bold text-orange-700 uppercase tracking-wide">Companies Act 2013 — Schedule II</p>
+                      <p className="text-xs text-orange-600 mt-0.5">SLM · Straight Line Method · Useful life in years</p>
                     </div>
-                    <Select
-                      value={selectedCategoryId}
-                      onValueChange={(v: string | null) => {
+
+                    <div className="space-y-1.5">
+                      <Label>Asset Group <span className="text-red-500">*</span></Label>
+                      <Select value={selectedGroup} onValueChange={(v: string | null) => {
+                        if (v) { setSelectedGroup(v); setSelectedCategoryId(""); setValue("categoryId", ""); setCustomValues({}); }
+                      }}>
+                        <SelectTrigger className="bg-white">
+                          <SelectDisplay value={selectedGroup} placeholder="Select CA group…">{selectedGroup}</SelectDisplay>
+                        </SelectTrigger>
+                        <SelectContent>{caGroups.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label>Asset Sub-type <span className="text-red-500">*</span></Label>
+                        <a href="/settings/categories" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-600 hover:underline">
+                          <ExternalLink className="w-3 h-3" />Manage
+                        </a>
+                      </div>
+                      <Select value={selectedCategoryId} onValueChange={(v: string | null) => {
                         if (v) { setValue("categoryId", v); setSelectedCategoryId(v); setCustomValues({}); }
-                      }}
-                    >
-                      <SelectTrigger disabled={!selectedGroup}>
-                        <SelectDisplay value={selectedCategoryId} placeholder={selectedGroup ? "Select sub-type" : "Select group first"}>
-                          {categories.find(c => c.id === selectedCategoryId)?.name}
-                        </SelectDisplay>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subCategories.map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.categoryId && <p className="text-xs text-red-500">Please select an asset category</p>}
-                    <p className="text-xs text-gray-400">Specific type within the group (affects useful life & depreciation rate)</p>
+                      }}>
+                        <SelectTrigger className="bg-white" disabled={!selectedGroup}>
+                          <SelectDisplay value={selectedCategoryId} placeholder={selectedGroup ? "Select sub-type…" : "Select group first"}>
+                            {categories.find(c => c.id === selectedCategoryId)?.name}
+                          </SelectDisplay>
+                        </SelectTrigger>
+                        <SelectContent>{subCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                      {errors.categoryId && <p className="text-xs text-red-500">Required</p>}
+                    </div>
+
+                    {selectedCategory && (
+                      <div className="bg-white rounded-lg border border-orange-100 p-3 space-y-1.5 text-sm">
+                        <div className="flex justify-between"><span className="text-gray-500">Useful Life</span><span className="font-semibold text-orange-700">{selectedCategory.usefulLifeCompaniesAct} years</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">CA Method</span><span className="font-medium">{selectedCategory.depreciationMethod === "SLM" ? "Straight Line (SLM)" : "Written Down Value (WDV)"}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Asset Type</span><span className="font-medium">{selectedCategory.isIntangible ? "Intangible" : "Tangible"}</span></div>
+                        <div className="flex justify-between text-xs text-gray-400"><span>Annual SLM rate ≈</span><span>{selectedCategory.usefulLifeCompaniesAct > 0 ? (100 / selectedCategory.usefulLifeCompaniesAct).toFixed(2) : "—"}%</span></div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Companies Act info */}
-                  {selectedCategory && (
-                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 mt-1">
-                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                        <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Companies Act 2013 (Schedule II)</p>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-blue-600">Asset Class</span>
-                            <span className="font-medium text-blue-900">{selectedCategory.group}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-blue-600">Useful Life</span>
-                            <span className="font-medium text-blue-900">{selectedCategory.usefulLifeCompaniesAct} years</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-blue-600">Method</span>
-                            <span className="font-medium text-blue-900">
-                              {selectedCategory.depreciationMethod === "SLM" ? "SLM (Straight Line)" : "WDV (Written Down Value)"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-blue-600">Type</span>
-                            <span className="font-medium text-blue-900">{selectedCategory.isIntangible ? "Intangible" : "Tangible"}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                        <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-2">Income Tax Act — Block Rate</p>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-green-600">Block</span>
-                            <span className="font-medium text-green-900 text-right text-xs leading-tight">{selectedCategory.itActBlock ?? "—"}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-green-600">Full year rate</span>
-                            <span className="font-medium text-green-900">{(selectedCategory.itActBlockRate * 100).toFixed(0)}% WDV</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-green-600">Half-year rate</span>
-                            <span className="font-medium text-green-900">{(selectedCategory.itActBlockRate * 50).toFixed(0)}% WDV</span>
-                          </div>
-                          <p className="text-xs text-green-600 mt-1">Half-year rule applies when asset is put to use after 3 Oct (less than 180 days in the FY)</p>
-                        </div>
-                      </div>
+                  {/* ── RIGHT: Income Tax Act ── */}
+                  <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-5 space-y-4">
+                    <div>
+                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Income Tax Act — Block of Assets</p>
+                      <p className="text-xs text-blue-600 mt-0.5">WDV · Written Down Value Method · Appendix I, IT Rules 1962</p>
                     </div>
-                  )}
 
-                  {/* IP Configuration */}
-                  <div className="space-y-1.5 md:col-span-2">
-                    <Label>IP Configuration <span className="text-gray-400 text-xs font-normal">(for networked assets)</span></Label>
-                    <Input {...register("ipConfiguration")} placeholder="e.g. 192.168.1.100" className="max-w-xs" />
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label>IT Act Block <span className="text-red-500">*</span></Label>
+                        <a href="/settings/categories" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                          <ExternalLink className="w-3 h-3" />Manage Blocks
+                        </a>
+                      </div>
+                      <Select value={selectedItBlockId} onValueChange={(v: string | null) => { if (v) setSelectedItBlockId(v); }}>
+                        <SelectTrigger className="bg-white">
+                          <SelectDisplay value={selectedItBlockId} placeholder="Select IT Act block…">
+                            {itActBlocks.find(b => b.id === selectedItBlockId)?.name}
+                          </SelectDisplay>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {itActBlocks.map(b => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-400">All assets in the same block pool together for IT Act depreciation</p>
+                    </div>
+
+                    {selectedItBlockId && (() => {
+                      const block = itActBlocks.find(b => b.id === selectedItBlockId);
+                      if (!block) return null;
+                      return (
+                        <div className="bg-white rounded-lg border border-blue-100 p-3 space-y-1.5 text-sm">
+                          <div className="flex justify-between"><span className="text-gray-500">Full-year rate</span><span className="font-bold text-blue-700 text-base">{(block.rate * 100).toFixed(0)}%</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Half-year rate</span><span className="font-semibold text-blue-500">{(block.rate * 50).toFixed(0)}%</span></div>
+                          <p className="text-xs text-gray-400">Half-year (50%) applies if asset put to use on/after 3 Oct — less than 180 days remaining in FY</p>
+                        </div>
+                      );
+                    })()}
                   </div>
-
-                  {/* Category custom fields */}
-                  {selectedCategoryFields.length > 0 && (
-                    <div className="md:col-span-2">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">{selectedCategory?.name} — Specific Fields</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {selectedCategoryFields.map(field => (
-                          <div key={field.key} className="space-y-1.5">
-                            <Label>{field.label}{field.required && <span className="text-red-500"> *</span>}</Label>
-                            {field.type === "select" && field.options ? (
-                              <Select
-                                value={customValues[field.key] ?? ""}
-                                onValueChange={(v: string | null) => {
-                                  if (v !== null) setCustomValues(prev => ({ ...prev, [field.key]: v }));
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectDisplay value={customValues[field.key] ?? ""} placeholder={`Select ${field.label}`}>
-                                    {customValues[field.key]}
-                                  </SelectDisplay>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {field.options.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Input
-                                type={field.type ?? "text"}
-                                value={customValues[field.key] ?? ""}
-                                onChange={e => setCustomValues(prev => ({ ...prev, [field.key]: e.target.value }))}
-                                placeholder={field.label}
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
+
+                {/* Custom fields from CA category */}
+                {selectedCategoryFields.length > 0 && (
+                  <div className="mt-5 pt-5 border-t">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">{selectedCategory?.name} — Specific Fields</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedCategoryFields.map(field => (
+                        <div key={field.key} className="space-y-1.5">
+                          <Label>{field.label}{field.required && <span className="text-red-500"> *</span>}</Label>
+                          {field.type === "select" && field.options ? (
+                            <Select value={customValues[field.key] ?? ""} onValueChange={(v: string | null) => { if (v !== null) setCustomValues(prev => ({ ...prev, [field.key]: v })); }}>
+                              <SelectTrigger><SelectDisplay value={customValues[field.key] ?? ""} placeholder={`Select ${field.label}`}>{customValues[field.key]}</SelectDisplay></SelectTrigger>
+                              <SelectContent>{field.options.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
+                            </Select>
+                          ) : (
+                            <Input type={field.type ?? "text"} value={customValues[field.key] ?? ""} onChange={e => setCustomValues(prev => ({ ...prev, [field.key]: e.target.value }))} placeholder={field.label} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* IP Configuration */}
+                <div className="mt-4 space-y-1.5">
+                  <Label>IP Configuration <span className="text-gray-400 text-xs font-normal">(networked assets only)</span></Label>
+                  <Input {...register("ipConfiguration")} placeholder="e.g. 192.168.1.100" className="max-w-xs" />
+                </div>
+
                 <div className="flex justify-between mt-6">
                   <Button type="button" variant="outline" onClick={() => setActiveTab("basic")}>← Back</Button>
                   <Button type="button" onClick={() => setActiveTab("financial")} className="bg-orange-500 hover:bg-orange-600">Next: Financial →</Button>

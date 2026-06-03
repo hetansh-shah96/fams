@@ -8,9 +8,10 @@ export default async function EditAssetPage({ params }: { params: Promise<{ id: 
   if (!["SUPER_ADMIN", "BRANCH_MANAGER"].includes(session!.user.role)) redirect("/assets");
 
   const { id } = await params;
-  const [asset, categories, locations, departments, suppliers, users] = await Promise.all([
+  const [asset, categories, itActBlocks, locations, departments, suppliers, users] = await Promise.all([
     prisma.asset.findUnique({ where: { id } }),
     prisma.assetCategory.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.itActBlock.findMany({ where: { isActive: true }, orderBy: { rate: "asc" } }),
     prisma.location.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     prisma.department.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, include: { location: true } }),
     prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
@@ -22,6 +23,7 @@ export default async function EditAssetPage({ params }: { params: Promise<{ id: 
   return (
     <AssetForm
       categories={categories}
+      itActBlocks={itActBlocks}
       locations={locations}
       departments={JSON.parse(JSON.stringify(departments))}
       suppliers={suppliers}

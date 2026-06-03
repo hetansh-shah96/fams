@@ -20,9 +20,7 @@ export async function POST(req: NextRequest) {
       code: body.code,
       name: body.name,
       group: body.group ?? null,
-      itActBlock: body.itActBlock ?? null,
       usefulLifeCompaniesAct: body.usefulLifeCompaniesAct ?? 5,
-      itActBlockRate: body.itActBlockRate ?? 0.15,
       depreciationMethod: body.depreciationMethod ?? "SLM",
       assetClassDescription: body.assetClassDescription ?? null,
       isIntangible: body.isIntangible ?? false,
@@ -58,8 +56,7 @@ export async function PUT(req: NextRequest) {
   if (!session || session.user.role !== "SUPER_ADMIN") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
-  const body = await req.json();
-  const { id, ...data } = body;
+  const { id, itActBlock: _ita, itActBlockRate: _itr, ...data } = await req.json();
   const cat = await prisma.assetCategory.update({ where: { id }, data });
   return NextResponse.json(cat);
 }

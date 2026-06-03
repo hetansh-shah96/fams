@@ -143,15 +143,25 @@ model AssetCategory {
   code                   String             @unique
   name                   String
   group                  String?
-  itActBlock             String?
   usefulLifeCompaniesAct Int                @default(5)
-  itActBlockRate         Float              @default(0.15)
   depreciationMethod     DepreciationMethod @default(SLM)
   assetClassDescription  String?
   isIntangible           Boolean            @default(false)
   customFields           Json?
   isActive               Boolean            @default(true)
   createdAt              DateTime           @default(now())
+
+  assets Asset[]
+}
+
+model ItActBlock {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  rate        Float
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
   assets Asset[]
 }
@@ -165,6 +175,7 @@ model Asset {
   model               String?
   serialNumber        String?
   categoryId          String
+  itActBlockId        String?
   purchaseDate        DateTime
   purchaseCost        Decimal     @db.Decimal(15, 2)
   gstPaid             Decimal     @default(0) @db.Decimal(15, 2)
@@ -191,6 +202,7 @@ model Asset {
   createdByUserId     String
 
   category          AssetCategory      @relation(fields: [categoryId], references: [id])
+  itActBlock        ItActBlock?        @relation(fields: [itActBlockId], references: [id])
   currentLocation   Location           @relation("CurrentLocation", fields: [currentLocationId], references: [id])
   currentDepartment Department         @relation("CurrentDepartment", fields: [currentDepartmentId], references: [id])
   assignedUser      User?              @relation("AssignedUser", fields: [assignedUserId], references: [id])

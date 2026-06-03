@@ -30,6 +30,7 @@ const createSchema = z.object({
   condition: z.string().optional(),
   customValues: z.record(z.string(), z.string()).nullish(),
   assignedToType: z.enum(["USER", "OFFICE"]).optional(),
+  itActBlockId: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
       condition: data.condition ?? "NEW",
       ...(data.customValues ? { customValues: data.customValues } : {}),
       assignedToType: (data.assignedToType ?? "OFFICE") as never,
+      itActBlockId: data.itActBlockId || null,
       createdByUserId: session.user.id,
     },
   });
