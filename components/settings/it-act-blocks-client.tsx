@@ -104,13 +104,13 @@ export function ItActBlocksClient() {
                 <tr><td colSpan={6} className="text-center py-10 text-gray-400">No blocks defined</td></tr>
               ) : items.map((b, i) => (
                 <tr key={b.id} className={`border-b last:border-0 hover:bg-blue-50 ${i % 2 === 1 ? "bg-blue-50/20" : ""}`}>
-                  <td className="px-4 py-3 font-semibold text-gray-900">{b.name}</td>
+                  <td className="px-4 py-3 font-semibold text-gray-900">{b.name.replace(/^\d+%\s*[—–-]\s*/, "")}</td>
                   <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{b.code}</span></td>
                   <td className="px-4 py-3 text-center">
-                    <span className="text-xl font-bold text-blue-700">{(b.rate * 100).toFixed(0)}%</span>
+                    <span className="text-sm font-semibold text-gray-700">{(b.rate * 100).toFixed(0)}%</span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className="text-sm font-semibold text-blue-500">{(b.rate * 50).toFixed(0)}%</span>
+                    <span className="text-sm text-gray-500">{(b.rate * 50).toFixed(0)}%</span>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500 max-w-xs">{b.description ?? "—"}</td>
                   <td className="px-4 py-3">

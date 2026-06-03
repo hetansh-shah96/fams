@@ -10,7 +10,8 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
   const asset = await prisma.asset.findUnique({
     where: { id },
     include: {
-      category: true,
+      category: { select: { name: true, group: true, usefulLifeCompaniesAct: true, depreciationMethod: true, customFields: true } },
+      itActBlock: { select: { name: true, rate: true } },
       currentLocation: true,
       currentDepartment: true,
       assignedUser: { select: { id: true, name: true, email: true } },

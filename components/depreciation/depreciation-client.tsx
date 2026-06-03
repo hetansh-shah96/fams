@@ -284,11 +284,11 @@ export function DepreciationClient({ assets, records, itActBlocks, fyList, selec
                     return (
                       <tr key={b.block.id} className={`border-b last:border-0 hover:bg-blue-50 ${i % 2 === 1 ? "bg-blue-50/20" : ""}`}>
                         <td className="px-4 py-3">
-                          <p className="font-semibold text-gray-900">{b.block.name}</p>
+                          <p className="font-semibold text-gray-900">{b.block.name.replace(/^\d+%\s*[—–-]\s*/, "")}</p>
                           <p className="text-xs font-mono text-gray-400">{b.block.code}</p>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className="text-xl font-bold text-blue-700">{(b.block.rate * 100).toFixed(0)}%</span>
+                          <span className="text-sm font-semibold text-gray-700">{(b.block.rate * 100).toFixed(0)}%</span>
                         </td>
                         <td className="px-4 py-3 text-right">{fmt(b.opening)}</td>
                         <td className="px-4 py-3 text-right text-green-700">{b.additions > 0 ? fmt(b.additions) : "—"}</td>

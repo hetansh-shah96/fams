@@ -41,7 +41,8 @@ interface Asset {
   ipConfiguration: string | null;
   description: string | null;
   createdAt: string;
-  category: { name: string; group: string | null; customFields: { key: string; label: string }[] | null };
+  category: { name: string; group: string | null; usefulLifeCompaniesAct: number; depreciationMethod: string; customFields: { key: string; label: string }[] | null };
+  itActBlock: { name: string; rate: number } | null;
   currentLocation: { name: string };
   customValues: Record<string, string> | null;
   currentDepartment: { name: string };
@@ -67,6 +68,7 @@ interface Asset {
     companiesActClosingWDV: string;
     itActDepreciation: string;
     itActClosingWDV: string;
+    halfYearRule: boolean;
   }[];
   maintenance: {
     id: string;
@@ -274,45 +276,90 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
             </TabsContent>
 
             <TabsContent value="depreciation">
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="flex justify-end mb-3">
-                    <Link href={`/depreciation?assetId=${asset.id}`}>
-                      <Button size="sm" variant="outline">
-                        <Calculator className="w-4 h-4 mr-2" />Run Depreciation
-                      </Button>
-                    </Link>
+              <div className="space-y-3">
+                {/* Rate info + Run button */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className="bg-orange-50 border border-orange-100 rounded px-2.5 py-1 text-orange-700 font-medium">
+                      CA: {asset.category.usefulLifeCompaniesAct} yrs {asset.category.depreciationMethod} · {(100 / asset.category.usefulLifeCompaniesAct).toFixed(2)}% p.a.
+                    </span>
+                    {asset.itActBlock && (
+                      <span className="bg-blue-50 border border-blue-100 rounded px-2.5 py-1 text-blue-700 font-medium">
+                        IT Act: {(asset.itActBlock.rate * 100).toFixed(0)}% WDV · ½yr {(asset.itActBlock.rate * 50).toFixed(0)}%
+                      </span>
+                    )}
                   </div>
-                  {asset.depreciation.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-6">No depreciation records</p>
-                  ) : (
-                    <table className="w-full text-xs">
+                  <Link href={`/depreciation?assetId=${asset.id}`}>
+                    <Button size="sm" variant="outline">
+                      <Calculator className="w-4 h-4 mr-2" />Run Depreciation
+                    </Button>
+                  </Link>
+                </div>
+
+                {/* Companies Act table */}
+                <div className="rounded-lg border overflow-hidden">
+                  <div className="bg-orange-50 border-b px-3 py-1.5 text-xs text-orange-700 font-medium">
+                    Companies Act 2013 (SLM) — {asset.category.usefulLifeCompaniesAct} yr useful life · {(100 / asset.category.usefulLifeCompaniesAct).toFixed(2)}% per annum
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs min-w-[500px]">
                       <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2">FY</th>
-                          <th className="text-right py-2">Opening WDV</th>
-                          <th className="text-right py-2">Co. Act Dep</th>
-                          <th className="text-right py-2">Co. Act WDV</th>
-                          <th className="text-right py-2">IT Act Dep</th>
-                          <th className="text-right py-2">IT Act WDV</th>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="text-left px-3 py-2 font-semibold text-gray-500">FY</th>
+                          <th className="text-right px-3 py-2 font-semibold text-gray-500">Opening WDV</th>
+                          <th className="text-right px-3 py-2 font-semibold text-gray-500">Depreciation</th>
+                          <th className="text-right px-3 py-2 font-semibold text-gray-500">Closing WDV</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {asset.depreciation.map((d) => (
-                          <tr key={d.id} className="border-b last:border-0">
-                            <td className="py-2 font-medium">{d.financialYear}</td>
-                            <td className="text-right py-2">₹{Number(d.openingWDV).toLocaleString("en-IN")}</td>
-                            <td className="text-right py-2 text-red-600">₹{Number(d.companiesActDepreciation).toLocaleString("en-IN")}</td>
-                            <td className="text-right py-2">₹{Number(d.companiesActClosingWDV).toLocaleString("en-IN")}</td>
-                            <td className="text-right py-2 text-red-600">₹{Number(d.itActDepreciation).toLocaleString("en-IN")}</td>
-                            <td className="text-right py-2">₹{Number(d.itActClosingWDV).toLocaleString("en-IN")}</td>
+                        {asset.depreciation.length === 0 ? (
+                          <tr><td colSpan={4} className="text-center py-6 text-gray-400">No records — click Run Depreciation</td></tr>
+                        ) : asset.depreciation.map((d, i) => (
+                          <tr key={d.id} className={`border-b last:border-0 hover:bg-orange-50 ${i % 2 === 1 ? "bg-amber-50/30" : ""}`}>
+                            <td className="px-3 py-2 font-semibold text-gray-700">{d.financialYear}</td>
+                            <td className="px-3 py-2 text-right">₹{Number(d.openingWDV).toLocaleString("en-IN")}</td>
+                            <td className="px-3 py-2 text-right text-red-600 font-medium">₹{Number(d.companiesActDepreciation).toLocaleString("en-IN")}</td>
+                            <td className="px-3 py-2 text-right font-medium">₹{Number(d.companiesActClosingWDV).toLocaleString("en-IN")}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  )}
-                </CardContent>
-              </Card>
+                  </div>
+                </div>
+
+                {/* IT Act table */}
+                {asset.itActBlock && (
+                  <div className="rounded-lg border overflow-hidden">
+                    <div className="bg-blue-50 border-b px-3 py-1.5 text-xs text-blue-700 font-medium">
+                      Income Tax Act (WDV) — Block: {asset.itActBlock.name.replace(/^\d+%\s*[—–-]\s*/, "")} · {(asset.itActBlock.rate * 100).toFixed(0)}% full year / {(asset.itActBlock.rate * 50).toFixed(0)}% half year
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs min-w-[500px]">
+                        <thead>
+                          <tr className="bg-gray-50 border-b">
+                            <th className="text-left px-3 py-2 font-semibold text-gray-500">FY</th>
+                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Opening WDV</th>
+                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Depreciation</th>
+                            <th className="text-right px-3 py-2 font-semibold text-gray-500">Closing WDV</th>
+                            <th className="text-center px-3 py-2 font-semibold text-gray-500">½yr</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {asset.depreciation.map((d, i) => (
+                            <tr key={d.id} className={`border-b last:border-0 hover:bg-blue-50 ${i % 2 === 1 ? "bg-blue-50/20" : ""}`}>
+                              <td className="px-3 py-2 font-semibold text-gray-700">{d.financialYear}</td>
+                              <td className="px-3 py-2 text-right">₹{Number(d.openingWDV).toLocaleString("en-IN")}</td>
+                              <td className="px-3 py-2 text-right text-red-600 font-medium">₹{Number(d.itActDepreciation).toLocaleString("en-IN")}</td>
+                              <td className="px-3 py-2 text-right font-medium">₹{Number(d.itActClosingWDV).toLocaleString("en-IN")}</td>
+                              <td className="px-3 py-2 text-center text-gray-400">{d.halfYearRule ? "✓" : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         </div>
