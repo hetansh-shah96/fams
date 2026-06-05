@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit, QrCode, ArrowRightLeft, Wrench, Calculator, Download } from "lucide-react";
+import { ArrowLeft, Edit, QrCode, ArrowRightLeft, Wrench, Calculator, Download, ClipboardCheck, Package, Clock } from "lucide-react";
 import { format } from "date-fns";
 import QRCodeDisplay from "@/components/assets/qr-code-display";
 
@@ -79,6 +79,15 @@ interface Asset {
     vendorName: string | null;
     remarks: string | null;
     createdBy: { name: string };
+  }[];
+  auditEntries: {
+    id: string;
+    status: string;
+    scannedAt: string | null;
+    notes: string | null;
+    auditSession: { name: string };
+    foundLocation: { name: string } | null;
+    scannedBy: { name: string };
   }[];
 }
 
@@ -174,6 +183,7 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
               <TabsTrigger value="transfers">Transfers ({asset.allocations.length})</TabsTrigger>
               <TabsTrigger value="maintenance">Maintenance ({asset.maintenance.length})</TabsTrigger>
               <TabsTrigger value="depreciation">Depreciation ({asset.depreciation.length})</TabsTrigger>
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
             </TabsList>
 
             <TabsContent value="details">
@@ -367,9 +377,123 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
                 </Tabs>
               </div>
             </TabsContent>
+            <TabsContent value="timeline">
+              <AssetTimeline asset={asset} />
+            </TabsContent>
           </Tabs>
         </div>
       </div>
     </div>
+  );
+}
+
+type TimelineEvent = {
+  id: string;
+  date: Date;
+  type: "created" | "transfer" | "maintenance" | "audit";
+  title: string;
+  subtitle?: string;
+  detail?: string;
+  badge?: string;
+  badgeColor?: string;
+};
+
+const EVENT_STYLES: Record<TimelineEvent["type"], { dot: string; icon: React.ReactNode }> = {
+  created:     { dot: "bg-gray-400",   icon: <Package className="w-3 h-3" /> },
+  transfer:    { dot: "bg-blue-500",   icon: <ArrowRightLeft className="w-3 h-3" /> },
+  maintenance: { dot: "bg-orange-500", icon: <Wrench className="w-3 h-3" /> },
+  audit:       { dot: "bg-purple-500", icon: <ClipboardCheck className="w-3 h-3" /> },
+};
+
+function AssetTimeline({ asset }: { asset: Asset }) {
+  const events: TimelineEvent[] = [
+    {
+      id: "created",
+      date: new Date(asset.createdAt),
+      type: "created" as const,
+      title: "Asset Added",
+      subtitle: `By ${asset.createdBy.name}`,
+      detail: `₹${Number(asset.purchaseCost).toLocaleString("en-IN")} · ${asset.category.name}`,
+    },
+    ...asset.allocations.map<TimelineEvent>((a) => ({
+      id: a.id,
+      date: new Date(a.transferDate),
+      type: "transfer",
+      title: `Transferred → ${a.toLocation.name}`,
+      subtitle: `${a.toDepartment.name}${a.toUser ? ` · ${a.toUser.name}` : ""}`,
+      detail: `By ${a.transferredBy.name}${a.notes ? ` · "${a.notes}"` : ""}`,
+      badge: a.status,
+      badgeColor: a.status === "COMPLETED" ? "bg-green-100 text-green-700" : a.status === "PENDING" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700",
+    })),
+    ...asset.maintenance.map<TimelineEvent>((m) => ({
+      id: m.id,
+      date: new Date(m.serviceDate),
+      type: "maintenance",
+      title: m.serviceType.replace(/_/g, " "),
+      subtitle: [m.vendorName, Number(m.cost) > 0 ? `₹${Number(m.cost).toLocaleString("en-IN")}` : null].filter(Boolean).join(" · ") || undefined,
+      detail: m.remarks ?? undefined,
+    })),
+    ...asset.auditEntries
+      .filter((e) => e.scannedAt)
+      .map<TimelineEvent>((e) => ({
+        id: e.id,
+        date: new Date(e.scannedAt!),
+        type: "audit",
+        title: e.auditSession.name,
+        subtitle: `By ${e.scannedBy.name}${e.foundLocation ? ` · Found at: ${e.foundLocation.name}` : ""}`,
+        detail: e.notes ?? undefined,
+        badge: e.status,
+        badgeColor:
+          e.status === "VERIFIED"  ? "bg-green-100 text-green-700"  :
+          e.status === "MISSING"   ? "bg-red-100 text-red-700"      :
+          e.status === "MISPLACED" ? "bg-orange-100 text-orange-700":
+                                     "bg-blue-100 text-blue-700",
+      })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  if (events.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center">
+          <Clock className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-400 text-sm">No timeline events yet</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-4 pb-2">
+        <div className="relative">
+          <div className="absolute left-[11px] top-2 bottom-2 w-px bg-gray-200" />
+          <div className="space-y-0">
+            {events.map((ev, i) => {
+              const style = EVENT_STYLES[ev.type];
+              return (
+                <div key={ev.id} className={`relative flex gap-4 pb-5 ${i === events.length - 1 ? "pb-1" : ""}`}>
+                  <div className={`relative z-10 flex-shrink-0 w-6 h-6 rounded-full ${style.dot} flex items-center justify-center text-white mt-0.5`}>
+                    {style.icon}
+                  </div>
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-gray-900 capitalize">{ev.title}</p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {ev.badge && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ev.badgeColor}`}>{ev.badge}</span>
+                        )}
+                        <span className="text-xs text-gray-400">{format(ev.date, "dd MMM yyyy")}</span>
+                      </div>
+                    </div>
+                    {ev.subtitle && <p className="text-xs text-gray-500 mt-0.5">{ev.subtitle}</p>}
+                    {ev.detail && <p className="text-xs text-gray-400 mt-0.5 italic">{ev.detail}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

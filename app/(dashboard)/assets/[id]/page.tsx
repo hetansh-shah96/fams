@@ -32,6 +32,14 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         orderBy: { serviceDate: "desc" },
         include: { createdBy: { select: { name: true } } },
       },
+      auditEntries: {
+        orderBy: { scannedAt: "desc" },
+        include: {
+          auditSession: { select: { name: true } },
+          scannedBy: { select: { name: true } },
+          foundLocation: { select: { name: true } },
+        },
+      },
     },
   });
 
