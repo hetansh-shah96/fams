@@ -61,6 +61,13 @@ enum AuditEntryStatus {
   EXCESS
 }
 
+enum DisposalMethod {
+  SOLD
+  SCRAPPED
+  DONATED
+  WRITTEN_OFF
+}
+
 enum AlertType {
   AMC_EXPIRY
   INSURANCE_EXPIRY
@@ -95,6 +102,7 @@ model User {
   auditEntries           AuditEntry[]
   auditLogs              AuditLog[]
   deptHeadOf             Department[]         @relation("DeptHead")
+  disposalsApproved      AssetDisposal[]
 }
 
 model Location {
@@ -212,6 +220,7 @@ model Asset {
   depreciation      DepreciationRecord[]
   maintenance       MaintenanceLog[]
   auditEntries      AuditEntry[]
+  disposal          AssetDisposal?
 }
 
 model Supplier {
@@ -368,6 +377,21 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([timestamp])
+}
+
+model AssetDisposal {
+  id              String         @id @default(cuid())
+  assetId         String         @unique
+  method          DisposalMethod
+  disposalDate    DateTime
+  saleValue       Decimal        @default(0) @db.Decimal(15, 2)
+  buyerName       String?
+  remarks         String?
+  approvedByUserId String
+  createdAt       DateTime       @default(now())
+
+  asset      Asset @relation(fields: [assetId], references: [id])
+  approvedBy User  @relation(fields: [approvedByUserId], references: [id])
 }
 
 model Company {

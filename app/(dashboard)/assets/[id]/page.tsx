@@ -40,6 +40,9 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
           foundLocation: { select: { name: true } },
         },
       },
+      disposal: {
+        include: { approvedBy: { select: { name: true } } },
+      },
     },
   });
 

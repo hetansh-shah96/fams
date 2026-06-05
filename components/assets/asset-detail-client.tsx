@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit, QrCode, ArrowRightLeft, Wrench, Calculator, Download, ClipboardCheck, Package, Clock } from "lucide-react";
+import { ArrowLeft, Edit, QrCode, ArrowRightLeft, Wrench, Calculator, Download, ClipboardCheck, Package, Clock, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import QRCodeDisplay from "@/components/assets/qr-code-display";
 
@@ -89,6 +90,14 @@ interface Asset {
     foundLocation: { name: string } | null;
     scannedBy: { name: string };
   }[];
+  disposal: {
+    method: string;
+    disposalDate: string;
+    saleValue: string;
+    buyerName: string | null;
+    remarks: string | null;
+    approvedBy: { name: string };
+  } | null;
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -101,7 +110,11 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: boolean }) {
+  const router = useRouter();
   const [showQR, setShowQR] = useState(false);
+  const [showDispose, setShowDispose] = useState(false);
+
+  const isDisposed = asset.status === "DISPOSED";
 
   return (
     <div className="space-y-6">
@@ -119,15 +132,28 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
           <Button variant="outline" size="sm" onClick={() => setShowQR(!showQR)}>
             <QrCode className="w-4 h-4 mr-2" />QR Code
           </Button>
-          {canEdit && (
-            <Link href={`/assets/${asset.id}/edit`}>
-              <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
-                <Edit className="w-4 h-4 mr-2" />Edit
+          {canEdit && !isDisposed && (
+            <>
+              <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setShowDispose(true)}>
+                <Trash2 className="w-4 h-4 mr-2" />Dispose
               </Button>
-            </Link>
+              <Link href={`/assets/${asset.id}/edit`}>
+                <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
+                  <Edit className="w-4 h-4 mr-2" />Edit
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </div>
+
+      {showDispose && (
+        <DisposeModal
+          asset={asset}
+          onClose={() => setShowDispose(false)}
+          onSuccess={() => { setShowDispose(false); router.refresh(); }}
+        />
+      )}
 
       {showQR && (
         <Card className="max-w-xs">
@@ -174,6 +200,24 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
               <InfoRow label="Supplier" value={asset.supplier?.name} />
             </CardContent>
           </Card>
+
+          {asset.disposal && (
+            <Card className="border-red-200 bg-red-50/40">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base text-red-700 flex items-center gap-2">
+                  <Trash2 className="w-4 h-4" />Disposal Record
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <InfoRow label="Method" value={asset.disposal.method.replace(/_/g, " ")} />
+                <InfoRow label="Date" value={format(new Date(asset.disposal.disposalDate), "dd MMM yyyy")} />
+                <InfoRow label="Sale Value" value={`₹${Number(asset.disposal.saleValue).toLocaleString("en-IN")}`} />
+                {asset.disposal.buyerName && <InfoRow label="Buyer" value={asset.disposal.buyerName} />}
+                {asset.disposal.remarks && <InfoRow label="Remarks" value={asset.disposal.remarks} />}
+                <InfoRow label="Approved By" value={asset.disposal.approvedBy.name} />
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="lg:col-span-2">
@@ -495,5 +539,122 @@ function AssetTimeline({ asset }: { asset: Asset }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+const DISPOSE_METHODS = ["SOLD", "SCRAPPED", "DONATED", "WRITTEN_OFF"] as const;
+
+function DisposeModal({ asset, onClose, onSuccess }: {
+  asset: Asset;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [method, setMethod] = useState<string>("SCRAPPED");
+  const [disposalDate, setDisposalDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [saleValue, setSaleValue] = useState("0");
+  const [buyerName, setBuyerName] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/dispose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method, disposalDate, saleValue: Number(saleValue), buyerName, remarks }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to dispose asset");
+        return;
+      }
+      onSuccess();
+    } catch {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Dispose Asset</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          <span className="font-mono text-orange-600">{asset.assetCode}</span> · {asset.name}
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Disposal Method</label>
+            <select
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              required
+            >
+              {DISPOSE_METHODS.map((m) => (
+                <option key={m} value={m}>{m.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Disposal Date</label>
+            <input
+              type="date"
+              value={disposalDate}
+              onChange={(e) => setDisposalDate(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sale / Scrap Value (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={saleValue}
+              onChange={(e) => setSaleValue(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          {method === "SOLD" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buyer Name</label>
+              <input
+                type="text"
+                value={buyerName}
+                onChange={(e) => setBuyerName(e.target.value)}
+                placeholder="Buyer / party name"
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              rows={2}
+              placeholder="Optional notes"
+              className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white" disabled={loading}>
+              {loading ? "Processing…" : "Confirm Disposal"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
