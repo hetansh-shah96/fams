@@ -12,13 +12,15 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { assetId, serviceType, vendorName, vendorContact, serviceDate, nextDueDate, cost, remarks, odometer, clickCount } = body;
 
+  const serviceDateObj = new Date(serviceDate);
+
   const log = await prisma.maintenanceLog.create({
     data: {
       assetId,
       serviceType,
       vendorName,
       vendorContact,
-      serviceDate: new Date(serviceDate),
+      serviceDate: serviceDateObj,
       nextDueDate: nextDueDate ? new Date(nextDueDate) : null,
       cost: cost ?? 0,
       remarks,
@@ -27,6 +29,19 @@ export async function POST(req: NextRequest) {
       createdByUserId: session.user.id,
     },
   });
+
+  // Auto-advance matching schedule if one exists
+  const schedule = await prisma.maintenanceSchedule.findUnique({
+    where: { assetId_serviceType: { assetId, serviceType } },
+  });
+  if (schedule && schedule.isActive) {
+    const advancedDate = new Date(serviceDateObj);
+    advancedDate.setDate(advancedDate.getDate() + schedule.frequencyDays);
+    await prisma.maintenanceSchedule.update({
+      where: { id: schedule.id },
+      data: { lastServiceDate: serviceDateObj, nextDueDate: advancedDate },
+    });
+  }
 
   await createAuditLog(session.user.id, "MAINTENANCE", "Asset", assetId, null, { serviceType, serviceDate });
   return NextResponse.json(log, { status: 201 });

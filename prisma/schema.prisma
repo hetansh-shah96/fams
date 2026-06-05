@@ -216,11 +216,12 @@ model Asset {
   assignedUser      User?              @relation("AssignedUser", fields: [assignedUserId], references: [id])
   createdBy         User               @relation("AssetCreator", fields: [createdByUserId], references: [id])
   supplier          Supplier?          @relation(fields: [supplierId], references: [id])
-  allocations       AssetAllocation[]
-  depreciation      DepreciationRecord[]
-  maintenance       MaintenanceLog[]
-  auditEntries      AuditEntry[]
-  disposal          AssetDisposal?
+  allocations          AssetAllocation[]
+  depreciation         DepreciationRecord[]
+  maintenance          MaintenanceLog[]
+  maintenanceSchedules MaintenanceSchedule[]
+  auditEntries         AuditEntry[]
+  disposal             AssetDisposal?
 }
 
 model Supplier {
@@ -377,6 +378,23 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([timestamp])
+}
+
+model MaintenanceSchedule {
+  id              String      @id @default(cuid())
+  assetId         String
+  serviceType     ServiceType
+  frequencyDays   Int
+  nextDueDate     DateTime
+  lastServiceDate DateTime?
+  notes           String?
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@unique([assetId, serviceType])
 }
 
 model AssetDisposal {

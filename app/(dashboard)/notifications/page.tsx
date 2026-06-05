@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { addDays, differenceInDays, format, isPast } from "date-fns";
+import { addDays, differenceInDays, format } from "date-fns";
 import Link from "next/link";
-import { Bell, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { Bell, AlertTriangle, CheckCircle, Clock, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -15,63 +15,87 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: "Other",
 };
 
+const DEFAULT_DAYS = 30;
+
 export default async function NotificationsPage() {
   const session = await auth();
   const role = session!.user.role;
   const locationId = session!.user.locationId;
   const locationFilter = role === "BRANCH_MANAGER" && locationId ? { asset: { currentLocationId: locationId } } : {};
+  const assetFilter = role === "BRANCH_MANAGER" && locationId ? { currentLocationId: locationId } : {};
 
-  const [overdue, dueSoon, warrantyExpiring, insuranceExpiring, pucExpiring] = await Promise.all([
-    // Overdue maintenance
+  // Load alert configs to respect per-type daysBeforeAlert
+  const alertConfigs = await prisma.alertConfig.findMany();
+  const getAlertDays = (type: string) =>
+    alertConfigs.find((c) => c.type === type)?.daysBeforeAlert ?? DEFAULT_DAYS;
+  const getAlertActive = (type: string) =>
+    alertConfigs.find((c) => c.type === type)?.isActive ?? true;
+
+  const maintDays = getAlertDays("SCHEDULED_SERVICE");
+  const warrantyDays = getAlertDays("WARRANTY_EXPIRY");
+  const insuranceDays = getAlertDays("INSURANCE_EXPIRY");
+  const pucDays = getAlertDays("PUC_EXPIRY");
+  const amcDays = getAlertDays("AMC_EXPIRY");
+
+  const now = new Date();
+
+  const [overdue, dueSoon, schedulesOverdue, schedulesDueSoon, warrantyAlerts, insuranceAlerts, pucAlerts] = await Promise.all([
+    // Overdue maintenance logs
     prisma.maintenanceLog.findMany({
-      where: { nextDueDate: { lt: new Date() }, resolvedAt: null, ...locationFilter },
+      where: { nextDueDate: { lt: now }, resolvedAt: null, ...locationFilter },
       orderBy: { nextDueDate: "asc" },
       take: 20,
       include: { asset: { select: { id: true, assetCode: true, name: true, currentLocation: { select: { name: true } } } } },
     }),
-    // Due within 30 days
+    // Maintenance logs due within configured window
     prisma.maintenanceLog.findMany({
-      where: { nextDueDate: { gte: new Date(), lte: addDays(new Date(), 30) }, ...locationFilter },
+      where: { nextDueDate: { gte: now, lte: addDays(now, maintDays) }, resolvedAt: null, ...locationFilter },
       orderBy: { nextDueDate: "asc" },
       take: 30,
       include: { asset: { select: { id: true, assetCode: true, name: true, currentLocation: { select: { name: true } } } } },
     }),
-    // Warranty expiring in 30 days
-    prisma.asset.findMany({
-      where: {
-        warrantyExpiry: { gte: new Date(), lte: addDays(new Date(), 30) },
-        ...(locationId && role === "BRANCH_MANAGER" ? { currentLocationId: locationId } : {}),
-      },
+    // Preventive schedules overdue
+    prisma.maintenanceSchedule.findMany({
+      where: { isActive: true, nextDueDate: { lt: now }, ...(locationId && role === "BRANCH_MANAGER" ? { asset: { currentLocationId: locationId } } : {}) },
+      orderBy: { nextDueDate: "asc" },
+      take: 20,
+      include: { asset: { select: { id: true, assetCode: true, name: true, currentLocation: { select: { name: true } } } } },
+    }),
+    // Preventive schedules due soon
+    prisma.maintenanceSchedule.findMany({
+      where: { isActive: true, nextDueDate: { gte: now, lte: addDays(now, amcDays) }, ...(locationId && role === "BRANCH_MANAGER" ? { asset: { currentLocationId: locationId } } : {}) },
+      orderBy: { nextDueDate: "asc" },
+      take: 30,
+      include: { asset: { select: { id: true, assetCode: true, name: true, currentLocation: { select: { name: true } } } } },
+    }),
+    // Warranty: already expired + expiring soon
+    getAlertActive("WARRANTY_EXPIRY") ? prisma.asset.findMany({
+      where: { warrantyExpiry: { lte: addDays(now, warrantyDays) }, status: { not: "DISPOSED" }, ...assetFilter },
       orderBy: { warrantyExpiry: "asc" },
       take: 20,
       select: { id: true, assetCode: true, name: true, warrantyExpiry: true, currentLocation: { select: { name: true } } },
-    }),
-    // Insurance expiring in 30 days
-    prisma.asset.findMany({
-      where: {
-        insuranceExpiry: { gte: new Date(), lte: addDays(new Date(), 30) },
-        ...(locationId && role === "BRANCH_MANAGER" ? { currentLocationId: locationId } : {}),
-      },
+    }) : Promise.resolve([]),
+    // Insurance: already expired + expiring soon
+    getAlertActive("INSURANCE_EXPIRY") ? prisma.asset.findMany({
+      where: { insuranceExpiry: { lte: addDays(now, insuranceDays) }, status: { not: "DISPOSED" }, ...assetFilter },
       orderBy: { insuranceExpiry: "asc" },
       take: 20,
       select: { id: true, assetCode: true, name: true, insuranceExpiry: true, currentLocation: { select: { name: true } } },
-    }),
-    // PUC expiring in 30 days
-    prisma.asset.findMany({
-      where: {
-        pucExpiry: { gte: new Date(), lte: addDays(new Date(), 30) },
-        ...(locationId && role === "BRANCH_MANAGER" ? { currentLocationId: locationId } : {}),
-      },
+    }) : Promise.resolve([]),
+    // PUC: already expired + expiring soon
+    getAlertActive("PUC_EXPIRY") ? prisma.asset.findMany({
+      where: { pucExpiry: { lte: addDays(now, pucDays) }, status: { not: "DISPOSED" }, ...assetFilter },
       orderBy: { pucExpiry: "asc" },
       take: 20,
       select: { id: true, assetCode: true, name: true, pucExpiry: true, currentLocation: { select: { name: true } } },
-    }),
+    }) : Promise.resolve([]),
   ]);
 
-  const totalAlerts = overdue.length + dueSoon.length + warrantyExpiring.length + insuranceExpiring.length + pucExpiring.length;
+  const totalAlerts = overdue.length + dueSoon.length + schedulesOverdue.length + schedulesDueSoon.length +
+    warrantyAlerts.length + insuranceAlerts.length + pucAlerts.length;
 
   function DaysChip({ date }: { date: Date | string }) {
-    const d = differenceInDays(new Date(date), new Date());
+    const d = differenceInDays(new Date(date), now);
     const past = d < 0;
     return (
       <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${past ? "bg-red-100 text-red-700" : d <= 7 ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700"}`}>
@@ -107,7 +131,6 @@ export default async function NotificationsPage() {
         </div>
       </div>
 
-      {/* Overdue */}
       {overdue.length > 0 && (
         <Card className="border-red-200">
           <CardHeader className="pb-2">
@@ -125,12 +148,28 @@ export default async function NotificationsPage() {
         </Card>
       )}
 
-      {/* Due Soon */}
+      {schedulesOverdue.length > 0 && (
+        <Card className="border-red-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-red-700">
+              <ShieldAlert className="w-4 h-4" />Overdue Preventive Schedules ({schedulesOverdue.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {schedulesOverdue.map(s => (
+              <AssetRow key={s.id} id={s.asset.id} assetCode={s.asset.assetCode} name={s.asset.name}
+                date={s.nextDueDate} label={`Schedule: ${s.serviceType.replace(/_/g, " ")}`}
+                location={s.asset.currentLocation?.name ?? "—"} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {dueSoon.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="w-4 h-4 text-orange-500" />Maintenance Due in 30 Days ({dueSoon.length})
+              <Clock className="w-4 h-4 text-orange-500" />Maintenance Due in {maintDays} Days ({dueSoon.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -143,16 +182,32 @@ export default async function NotificationsPage() {
         </Card>
       )}
 
-      {/* Warranty */}
-      {warrantyExpiring.length > 0 && (
+      {schedulesDueSoon.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-blue-500" />Warranty Expiring ({warrantyExpiring.length})
+              <Clock className="w-4 h-4 text-blue-500" />Preventive Schedules Due in {amcDays} Days ({schedulesDueSoon.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {warrantyExpiring.map(a => (
+            {schedulesDueSoon.map(s => (
+              <AssetRow key={s.id} id={s.asset.id} assetCode={s.asset.assetCode} name={s.asset.name}
+                date={s.nextDueDate} label={`Schedule: ${s.serviceType.replace(/_/g, " ")}`}
+                location={s.asset.currentLocation?.name ?? "—"} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {warrantyAlerts.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-blue-500" />Warranty Expired / Expiring ({warrantyAlerts.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {warrantyAlerts.map(a => (
               <AssetRow key={a.id} id={a.id} assetCode={a.assetCode} name={a.name}
                 date={a.warrantyExpiry!} label="Warranty" location={a.currentLocation?.name ?? "—"} />
             ))}
@@ -160,16 +215,15 @@ export default async function NotificationsPage() {
         </Card>
       )}
 
-      {/* Insurance */}
-      {insuranceExpiring.length > 0 && (
+      {insuranceAlerts.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-purple-500" />Insurance Expiring ({insuranceExpiring.length})
+              <CheckCircle className="w-4 h-4 text-purple-500" />Insurance Expired / Expiring ({insuranceAlerts.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {insuranceExpiring.map(a => (
+            {insuranceAlerts.map(a => (
               <AssetRow key={a.id} id={a.id} assetCode={a.assetCode} name={a.name}
                 date={a.insuranceExpiry!} label="Insurance" location={a.currentLocation?.name ?? "—"} />
             ))}
@@ -177,16 +231,15 @@ export default async function NotificationsPage() {
         </Card>
       )}
 
-      {/* PUC */}
-      {pucExpiring.length > 0 && (
+      {pucAlerts.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-500" />PUC Expiring ({pucExpiring.length})
+              <CheckCircle className="w-4 h-4 text-green-500" />PUC Expired / Expiring ({pucAlerts.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {pucExpiring.map(a => (
+            {pucAlerts.map(a => (
               <AssetRow key={a.id} id={a.id} assetCode={a.assetCode} name={a.name}
                 date={a.pucExpiry!} label="PUC" location={a.currentLocation?.name ?? "—"} />
             ))}
@@ -199,7 +252,7 @@ export default async function NotificationsPage() {
           <CardContent className="py-16 text-center">
             <Bell className="w-10 h-10 text-gray-200 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">All clear — no active alerts</p>
-            <p className="text-gray-400 text-sm mt-1">No overdue maintenance or expiring documents</p>
+            <p className="text-gray-400 text-sm mt-1">No overdue maintenance, expired documents, or due schedules</p>
           </CardContent>
         </Card>
       )}

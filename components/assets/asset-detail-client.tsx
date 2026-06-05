@@ -98,6 +98,15 @@ interface Asset {
     remarks: string | null;
     approvedBy: { name: string };
   } | null;
+  maintenanceSchedules: {
+    id: string;
+    serviceType: string;
+    frequencyDays: number;
+    nextDueDate: string;
+    lastServiceDate: string | null;
+    notes: string | null;
+    isActive: boolean;
+  }[];
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -294,39 +303,45 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
             </TabsContent>
 
             <TabsContent value="maintenance">
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="flex justify-end mb-3">
-                    {canEdit && (
-                      <Link href={`/maintenance/new?assetId=${asset.id}`}>
-                        <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
-                          <Wrench className="w-4 h-4 mr-2" />Add Log
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                  {asset.maintenance.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-6">No maintenance logs</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {asset.maintenance.map((m) => (
-                        <div key={m.id} className="border rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-sm font-medium">{m.serviceType.replace(/_/g, " ")}</p>
-                            <span className="text-sm font-semibold text-gray-700">₹{Number(m.cost).toLocaleString("en-IN")}</span>
+              <div className="space-y-4">
+                <MaintenanceSchedulesSection asset={asset} canEdit={canEdit} />
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center justify-between">
+                      Service Logs
+                      {canEdit && (
+                        <Link href={`/maintenance/new?assetId=${asset.id}`}>
+                          <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
+                            <Wrench className="w-4 h-4 mr-2" />Add Log
+                          </Button>
+                        </Link>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {asset.maintenance.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-6">No maintenance logs</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {asset.maintenance.map((m) => (
+                          <div key={m.id} className="border rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-medium">{m.serviceType.replace(/_/g, " ")}</p>
+                              <span className="text-sm font-semibold text-gray-700">₹{Number(m.cost).toLocaleString("en-IN")}</span>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {format(new Date(m.serviceDate), "dd MMM yyyy")}
+                              {m.nextDueDate && ` · Next: ${format(new Date(m.nextDueDate), "dd MMM yyyy")}`}
+                              {m.vendorName && ` · ${m.vendorName}`}
+                            </p>
+                            {m.remarks && <p className="text-xs text-gray-600 mt-1">{m.remarks}</p>}
                           </div>
-                          <p className="text-xs text-gray-500">
-                            {format(new Date(m.serviceDate), "dd MMM yyyy")}
-                            {m.nextDueDate && ` · Next: ${format(new Date(m.nextDueDate), "dd MMM yyyy")}`}
-                            {m.vendorName && ` · ${m.vendorName}`}
-                          </p>
-                          {m.remarks && <p className="text-xs text-gray-600 mt-1">{m.remarks}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="depreciation">
@@ -441,6 +456,158 @@ type TimelineEvent = {
   badge?: string;
   badgeColor?: string;
 };
+
+const FREQ_OPTIONS = [
+  { label: "Weekly", days: 7 },
+  { label: "Monthly", days: 30 },
+  { label: "Quarterly", days: 90 },
+  { label: "Half-yearly", days: 180 },
+  { label: "Yearly", days: 365 },
+  { label: "2 Years", days: 730 },
+];
+
+const SERVICE_TYPES = [
+  "AMC_VISIT", "BREAKDOWN_REPAIR", "SCHEDULED_SERVICE",
+  "INSURANCE_RENEWAL", "PUC_RENEWAL", "WARRANTY_CLAIM", "OTHER",
+];
+
+function MaintenanceSchedulesSection({ asset, canEdit }: { asset: Asset; canEdit: boolean }) {
+  const router = useRouter();
+  const [showForm, setShowForm] = useState(false);
+  const [serviceType, setServiceType] = useState("AMC_VISIT");
+  const [frequencyDays, setFrequencyDays] = useState(365);
+  const [nextDueDate, setNextDueDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    await fetch(`/api/assets/${asset.id}/schedules`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ serviceType, frequencyDays, nextDueDate, notes }),
+    });
+    setSaving(false);
+    setShowForm(false);
+    setNotes("");
+    router.refresh();
+  }
+
+  async function handleToggle(sid: string, isActive: boolean) {
+    setToggling(sid);
+    await fetch(`/api/assets/${asset.id}/schedules/${sid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: !isActive }),
+    });
+    setToggling(null);
+    router.refresh();
+  }
+
+  async function handleDelete(sid: string) {
+    if (!confirm("Delete this schedule?")) return;
+    setDeleting(sid);
+    await fetch(`/api/assets/${asset.id}/schedules/${sid}`, { method: "DELETE" });
+    setDeleting(null);
+    router.refresh();
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center justify-between">
+          Preventive Maintenance Schedules
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
+              <Wrench className="w-3 h-3 mr-1" />Add Schedule
+            </Button>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {showForm && (
+          <form onSubmit={handleAdd} className="border rounded-lg p-3 mb-3 space-y-3 bg-orange-50/40">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Service Type</label>
+                <select value={serviceType} onChange={(e) => setServiceType(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm">
+                  {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Frequency</label>
+                <select value={frequencyDays} onChange={(e) => setFrequencyDays(Number(e.target.value))} className="w-full border rounded px-2 py-1.5 text-sm">
+                  {FREQ_OPTIONS.map((o) => <option key={o.days} value={o.days}>{o.label} ({o.days}d)</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Next Due Date</label>
+                <input type="date" value={nextDueDate} onChange={(e) => setNextDueDate(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm" required />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-1">Notes (optional)</label>
+                <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. vendor name" className="w-full border rounded px-2 py-1.5 text-sm" />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button type="submit" size="sm" className="bg-orange-500 hover:bg-orange-600" disabled={saving}>
+                {saving ? "Saving…" : "Save Schedule"}
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {asset.maintenanceSchedules.length === 0 && !showForm ? (
+          <p className="text-sm text-gray-400 text-center py-4">No schedules defined</p>
+        ) : (
+          <div className="space-y-2">
+            {asset.maintenanceSchedules.map((s) => {
+              const daysLeft = Math.ceil((new Date(s.nextDueDate).getTime() - Date.now()) / 86400000);
+              const overdue = daysLeft < 0;
+              const urgent = daysLeft >= 0 && daysLeft <= 14;
+              return (
+                <div key={s.id} className={`flex items-center justify-between border rounded-lg px-3 py-2 ${!s.isActive ? "opacity-50 bg-gray-50" : overdue ? "border-red-200 bg-red-50/30" : urgent ? "border-orange-200 bg-orange-50/30" : ""}`}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{s.serviceType.replace(/_/g, " ")}</p>
+                    <p className="text-xs text-gray-500">
+                      Every {FREQ_OPTIONS.find(o => o.days === s.frequencyDays)?.label ?? `${s.frequencyDays}d`}
+                      {s.lastServiceDate && ` · Last: ${format(new Date(s.lastServiceDate), "dd MMM yy")}`}
+                      {s.notes && ` · ${s.notes}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-gray-700">{format(new Date(s.nextDueDate), "dd MMM yyyy")}</p>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${overdue ? "bg-red-100 text-red-700" : urgent ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700"}`}>
+                        {overdue ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? "Today" : `${daysLeft}d`}
+                      </span>
+                    </div>
+                    {canEdit && (
+                      <>
+                        <button onClick={() => handleToggle(s.id, s.isActive)} disabled={toggling === s.id} className="text-xs text-gray-400 hover:text-gray-600 px-1">
+                          {s.isActive ? "Pause" : "Resume"}
+                        </button>
+                        <button onClick={() => handleDelete(s.id)} disabled={deleting === s.id} className="text-xs text-red-400 hover:text-red-600 px-1">
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 const EVENT_STYLES: Record<TimelineEvent["type"], { dot: string; icon: React.ReactNode }> = {
   created:     { dot: "bg-gray-400",   icon: <Package className="w-3 h-3" /> },
