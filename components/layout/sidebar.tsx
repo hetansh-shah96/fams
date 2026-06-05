@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   X,
+  ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -51,6 +52,14 @@ const navItems = [
     ],
   },
   { href: "/audit", label: "Audit", icon: ClipboardCheck },
+  {
+    label: "Procurement",
+    icon: ShoppingCart,
+    children: [
+      { href: "/purchase-orders", label: "Purchase Orders" },
+      { href: "/purchase-orders/new", label: "New PO" },
+    ],
+  },
   {
     label: "Reports",
     icon: FileBarChart,

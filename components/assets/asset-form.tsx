@@ -75,8 +75,9 @@ interface Props {
   locations: { id: string; name: string }[];
   departments: { id: string; name: string; locationId: string; location: { name: string } }[];
   suppliers: { id: string; name: string }[];
+  purchaseOrders: { id: string; poNumber: string; supplier: { name: string } }[];
   users: { id: string; name: string; email: string }[];
-  asset?: Partial<FormData> & { id?: string; customValues?: Record<string, string>; assignedToType?: string; itActBlockId?: string };
+  asset?: Partial<FormData> & { id?: string; customValues?: Record<string, string>; assignedToType?: string; itActBlockId?: string; purchaseOrderId?: string };
 }
 
 const TABS = ["basic", "classification", "financial", "location", "compliance"] as const;
@@ -98,7 +99,7 @@ const TAB_FIELDS: Record<Tab, (keyof FormData)[]> = {
   compliance: [],
 };
 
-export function AssetForm({ categories, itActBlocks, locations, departments, suppliers, users, asset }: Props) {
+export function AssetForm({ categories, itActBlocks, locations, departments, suppliers, purchaseOrders, users, asset }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("basic");
@@ -112,6 +113,7 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
 
   const [selectedLocationId, setSelectedLocationId] = useState(asset?.currentLocationId ?? "");
   const [selectedSupplierId, setSelectedSupplierId] = useState(asset?.supplierId ?? "");
+  const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState(asset?.purchaseOrderId ?? "");
   const [selectedDeptId, setSelectedDeptId] = useState(asset?.currentDepartmentId ?? "");
   const [selectedUserId, setSelectedUserId] = useState(asset?.assignedUserId ?? "");
   const [assignedToType, setAssignedToType] = useState<"OFFICE" | "USER">(
@@ -175,6 +177,7 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
           assignedToType,
           assignedUserId: assignedToType === "USER" ? data.assignedUserId : null,
           itActBlockId: selectedItBlockId || null,
+          purchaseOrderId: selectedPurchaseOrderId || null,
         }),
       });
       if (!res.ok) {
@@ -467,6 +470,26 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
                       </SelectTrigger>
                       <SelectContent>
                         {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>Purchase Order</Label>
+                      <a href="/purchase-orders/new" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-600 hover:underline">
+                        <ExternalLink className="w-3 h-3" />New PO
+                      </a>
+                    </div>
+                    <Select value={selectedPurchaseOrderId} onValueChange={(v: string | null) => setSelectedPurchaseOrderId(v ?? "")}>
+                      <SelectTrigger>
+                        <SelectDisplay value={selectedPurchaseOrderId} placeholder="Link to PO (optional)">
+                          {purchaseOrders.find(p => p.id === selectedPurchaseOrderId)?.poNumber}
+                        </SelectDisplay>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {purchaseOrders.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.poNumber} — {p.supplier.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

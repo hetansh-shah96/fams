@@ -68,6 +68,14 @@ enum DisposalMethod {
   WRITTEN_OFF
 }
 
+enum POStatus {
+  DRAFT
+  APPROVED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CLOSED
+}
+
 enum AlertType {
   AMC_EXPIRY
   INSURANCE_EXPIRY
@@ -103,6 +111,7 @@ model User {
   auditLogs              AuditLog[]
   deptHeadOf             Department[]         @relation("DeptHead")
   disposalsApproved      AssetDisposal[]
+  purchaseOrdersCreated  PurchaseOrder[]
 }
 
 model Location {
@@ -205,6 +214,7 @@ model Asset {
   condition           String?     @default("NEW")
   customValues        Json?
   supplierId          String?
+  purchaseOrderId     String?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
   createdByUserId     String
@@ -216,12 +226,31 @@ model Asset {
   assignedUser      User?              @relation("AssignedUser", fields: [assignedUserId], references: [id])
   createdBy         User               @relation("AssetCreator", fields: [createdByUserId], references: [id])
   supplier          Supplier?          @relation(fields: [supplierId], references: [id])
+  purchaseOrder     PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
   allocations          AssetAllocation[]
   depreciation         DepreciationRecord[]
   maintenance          MaintenanceLog[]
   maintenanceSchedules MaintenanceSchedule[]
   auditEntries         AuditEntry[]
   disposal             AssetDisposal?
+}
+
+model PurchaseOrder {
+  id               String    @id @default(cuid())
+  poNumber         String    @unique
+  supplierId       String
+  poDate           DateTime
+  expectedDelivery DateTime?
+  totalAmount      Decimal   @db.Decimal(15, 2)
+  status           POStatus  @default(DRAFT)
+  notes            String?
+  createdByUserId  String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  supplier  Supplier @relation(fields: [supplierId], references: [id])
+  createdBy User     @relation(fields: [createdByUserId], references: [id])
+  assets    Asset[]
 }
 
 model Supplier {
@@ -245,7 +274,8 @@ model Supplier {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
 
-  assets Asset[]
+  assets         Asset[]
+  purchaseOrders PurchaseOrder[]
 }
 
 model AssetAllocation {

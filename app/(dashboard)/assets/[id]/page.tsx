@@ -16,6 +16,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
       currentDepartment: true,
       assignedUser: { select: { id: true, name: true, email: true } },
       supplier: true,
+      purchaseOrder: { select: { id: true, poNumber: true } },
       createdBy: { select: { name: true } },
       allocations: {
         orderBy: { createdAt: "desc" },

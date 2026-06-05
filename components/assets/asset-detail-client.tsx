@@ -49,6 +49,7 @@ interface Asset {
   currentDepartment: { name: string };
   assignedUser: { name: string; email: string } | null;
   supplier: { name: string } | null;
+  purchaseOrder: { id: string; poNumber: string } | null;
   createdBy: { name: string };
   allocations: {
     id: string;
@@ -207,6 +208,11 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
               <InfoRow label="Residual Value" value={`₹${Number(asset.residualValue).toLocaleString("en-IN")}`} />
               <InfoRow label="Invoice No" value={asset.invoiceNumber} />
               <InfoRow label="Supplier" value={asset.supplier?.name} />
+              <InfoRow label="Purchase Order" value={
+                asset.purchaseOrder
+                  ? <Link href={`/purchase-orders/${asset.purchaseOrder.id}`} className="text-blue-600 hover:underline font-mono">{asset.purchaseOrder.poNumber}</Link>
+                  : null
+              } />
             </CardContent>
           </Card>
 

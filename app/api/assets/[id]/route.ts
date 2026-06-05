@@ -73,6 +73,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       ...(body.customValues !== undefined ? { customValues: body.customValues } : {}),
       ...(body.assignedToType ? { assignedToType: body.assignedToType } : {}),
       itActBlockId: body.itActBlockId || null,
+      purchaseOrderId: body.purchaseOrderId || null,
     },
   });
 
