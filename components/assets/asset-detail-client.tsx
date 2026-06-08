@@ -99,6 +99,16 @@ interface Asset {
     remarks: string | null;
     approvedBy: { name: string };
   } | null;
+  adjustments: {
+    id: string;
+    type: string;
+    adjustmentDate: string;
+    previousCost: string;
+    adjustmentAmount: string;
+    newCost: string;
+    reason: string;
+    approvedBy: { name: string };
+  }[];
   maintenanceSchedules: {
     id: string;
     serviceType: string;
@@ -123,6 +133,7 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
   const router = useRouter();
   const [showQR, setShowQR] = useState(false);
   const [showDispose, setShowDispose] = useState(false);
+  const [showAdjust, setShowAdjust] = useState(false);
 
   const isDisposed = asset.status === "DISPOSED";
 
@@ -144,6 +155,9 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
           </Button>
           {canEdit && !isDisposed && (
             <>
+              <Button variant="outline" size="sm" onClick={() => setShowAdjust(true)}>
+                <Calculator className="w-4 h-4 mr-2" />Adjust Value
+              </Button>
               <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setShowDispose(true)}>
                 <Trash2 className="w-4 h-4 mr-2" />Dispose
               </Button>
@@ -162,6 +176,14 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
           asset={asset}
           onClose={() => setShowDispose(false)}
           onSuccess={() => { setShowDispose(false); router.refresh(); }}
+        />
+      )}
+
+      {showAdjust && (
+        <AdjustModal
+          asset={asset}
+          onClose={() => setShowAdjust(false)}
+          onSuccess={() => { setShowAdjust(false); router.refresh(); }}
         />
       )}
 
@@ -230,6 +252,35 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
                 {asset.disposal.buyerName && <InfoRow label="Buyer" value={asset.disposal.buyerName} />}
                 {asset.disposal.remarks && <InfoRow label="Remarks" value={asset.disposal.remarks} />}
                 <InfoRow label="Approved By" value={asset.disposal.approvedBy.name} />
+              </CardContent>
+            </Card>
+          )}
+
+          {asset.adjustments.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calculator className="w-4 h-4" />Value Adjustment History
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {asset.adjustments.map((adj) => (
+                  <div key={adj.id} className="border rounded-lg p-3 text-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <Badge variant="outline">{adj.type.replace(/_/g, " ")}</Badge>
+                      <span className="text-xs text-gray-500">{format(new Date(adj.adjustmentDate), "dd MMM yyyy")}</span>
+                    </div>
+                    <p className="text-gray-700">
+                      ₹{Number(adj.previousCost).toLocaleString("en-IN")} → ₹{Number(adj.newCost).toLocaleString("en-IN")}
+                      {" "}
+                      <span className={Number(adj.adjustmentAmount) < 0 ? "text-red-600" : "text-green-600"}>
+                        ({Number(adj.adjustmentAmount) >= 0 ? "+" : ""}₹{Number(adj.adjustmentAmount).toLocaleString("en-IN")})
+                      </span>
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{adj.reason}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Approved by {adj.approvedBy.name}</p>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}
@@ -455,7 +506,7 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
 type TimelineEvent = {
   id: string;
   date: Date;
-  type: "created" | "transfer" | "maintenance" | "audit";
+  type: "created" | "transfer" | "maintenance" | "audit" | "adjustment";
   title: string;
   subtitle?: string;
   detail?: string;
@@ -620,6 +671,7 @@ const EVENT_STYLES: Record<TimelineEvent["type"], { dot: string; icon: React.Rea
   transfer:    { dot: "bg-blue-500",   icon: <ArrowRightLeft className="w-3 h-3" /> },
   maintenance: { dot: "bg-orange-500", icon: <Wrench className="w-3 h-3" /> },
   audit:       { dot: "bg-purple-500", icon: <ClipboardCheck className="w-3 h-3" /> },
+  adjustment:  { dot: "bg-emerald-500", icon: <Calculator className="w-3 h-3" /> },
 };
 
 function AssetTimeline({ asset }: { asset: Asset }) {
@@ -666,6 +718,16 @@ function AssetTimeline({ asset }: { asset: Asset }) {
           e.status === "MISPLACED" ? "bg-orange-100 text-orange-700":
                                      "bg-blue-100 text-blue-700",
       })),
+    ...asset.adjustments.map<TimelineEvent>((adj) => ({
+      id: adj.id,
+      date: new Date(adj.adjustmentDate),
+      type: "adjustment",
+      title: `Value Adjusted — ${adj.type.replace(/_/g, " ")}`,
+      subtitle: `₹${Number(adj.previousCost).toLocaleString("en-IN")} → ₹${Number(adj.newCost).toLocaleString("en-IN")} · By ${adj.approvedBy.name}`,
+      detail: adj.reason,
+      badge: Number(adj.adjustmentAmount) >= 0 ? "INCREASE" : "DECREASE",
+      badgeColor: Number(adj.adjustmentAmount) >= 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700",
+    })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   if (events.length === 0) {
@@ -824,6 +886,124 @@ function DisposeModal({ asset, onClose, onSuccess }: {
             </Button>
             <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white" disabled={loading}>
               {loading ? "Processing…" : "Confirm Disposal"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+const ADJUSTMENT_TYPES = [
+  { value: "REVALUATION_UP", label: "Revaluation — Up" },
+  { value: "REVALUATION_DOWN", label: "Revaluation — Down" },
+  { value: "COST_CORRECTION", label: "Cost Correction" },
+  { value: "PARTIAL_WRITE_OFF", label: "Partial Write-Off" },
+] as const;
+
+function AdjustModal({ asset, onClose, onSuccess }: {
+  asset: Asset;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [type, setType] = useState<string>("REVALUATION_UP");
+  const [adjustmentDate, setAdjustmentDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [adjustmentAmount, setAdjustmentAmount] = useState("0");
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const isDecrease = type === "REVALUATION_DOWN" || type === "PARTIAL_WRITE_OFF";
+  const amountNum = Number(adjustmentAmount) || 0;
+  const previewNewCost = Number(asset.purchaseCost) + (isDecrease ? -Math.abs(amountNum) : Math.abs(amountNum));
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/adjust`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, adjustmentDate, adjustmentAmount: amountNum, reason }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to adjust asset value");
+        return;
+      }
+      onSuccess();
+    } catch {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Adjust Asset Value</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          <span className="font-mono text-orange-600">{asset.assetCode}</span> · {asset.name}
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Adjustment Type</label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              required
+            >
+              {ADJUSTMENT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Adjustment Date</label>
+            <input
+              type="date"
+              value={adjustmentDate}
+              onChange={(e) => setAdjustmentDate(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Adjustment Amount (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={adjustmentAmount}
+              onChange={(e) => setAdjustmentAmount(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Current cost ₹{Number(asset.purchaseCost).toLocaleString("en-IN")} → new cost ₹{previewNewCost.toLocaleString("en-IN")}
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              placeholder="Reason for this adjustment"
+              className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
+              required
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
+              {loading ? "Processing…" : "Confirm Adjustment"}
             </Button>
           </div>
         </form>

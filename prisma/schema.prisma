@@ -111,6 +111,7 @@ model User {
   auditLogs              AuditLog[]
   deptHeadOf             Department[]         @relation("DeptHead")
   disposalsApproved      AssetDisposal[]
+  adjustmentsApproved    AssetAdjustment[]
   purchaseOrdersCreated  PurchaseOrder[]
 }
 
@@ -233,6 +234,7 @@ model Asset {
   maintenanceSchedules MaintenanceSchedule[]
   auditEntries         AuditEntry[]
   disposal             AssetDisposal?
+  adjustments          AssetAdjustment[]
 }
 
 model PurchaseOrder {
@@ -425,6 +427,29 @@ model MaintenanceSchedule {
   asset Asset @relation(fields: [assetId], references: [id])
 
   @@unique([assetId, serviceType])
+}
+
+enum AdjustmentType {
+  REVALUATION_UP
+  REVALUATION_DOWN
+  COST_CORRECTION
+  PARTIAL_WRITE_OFF
+}
+
+model AssetAdjustment {
+  id               String         @id @default(cuid())
+  assetId          String
+  type             AdjustmentType
+  adjustmentDate   DateTime
+  previousCost     Decimal        @db.Decimal(15, 2)
+  adjustmentAmount Decimal        @db.Decimal(15, 2)
+  newCost          Decimal        @db.Decimal(15, 2)
+  reason           String
+  approvedByUserId String
+  createdAt        DateTime       @default(now())
+
+  asset      Asset @relation(fields: [assetId], references: [id])
+  approvedBy User  @relation(fields: [approvedByUserId], references: [id])
 }
 
 model AssetDisposal {
