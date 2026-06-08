@@ -189,6 +189,7 @@ model Asset {
   id                  String      @id @default(cuid())
   assetCode           String      @unique
   assetTagNumber      String?     @unique
+  rfidTag             String?     @unique
   name                String
   make                String?
   model               String?

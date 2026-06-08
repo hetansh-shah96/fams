@@ -10,6 +10,7 @@ const createSchema = z.object({
   make: z.string().optional(),
   model: z.string().optional(),
   serialNumber: z.string().optional(),
+  rfidTag: z.string().optional(),
   categoryId: z.string(),
   purchaseDate: z.string(),
   purchaseCost: z.number(),
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
       make: data.make,
       model: data.model,
       serialNumber: data.serialNumber,
+      rfidTag: data.rfidTag || null,
       categoryId: data.categoryId,
       purchaseDate: new Date(data.purchaseDate),
       purchaseCost: data.purchaseCost,
@@ -105,6 +107,8 @@ export async function GET(req: NextRequest) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
       { assetCode: { contains: search, mode: "insensitive" } },
+      { serialNumber: { contains: search, mode: "insensitive" } },
+      { rfidTag: { equals: search, mode: "insensitive" } },
     ];
   }
   if (status) where.status = status;

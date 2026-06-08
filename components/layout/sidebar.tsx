@@ -31,6 +31,7 @@ const navItems = [
       { href: "/assets/new", label: "Add Asset" },
       { href: "/assets/import", label: "Bulk Import" },
       { href: "/assets/qr-scanner", label: "QR Scanner" },
+      { href: "/assets/rfid-scanner", label: "RFID Scanner" },
     ],
   },
   {

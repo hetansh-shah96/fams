@@ -53,6 +53,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       make: body.make,
       model: body.model,
       serialNumber: body.serialNumber,
+      rfidTag: body.rfidTag || null,
       categoryId: body.categoryId,
       purchaseDate: new Date(body.purchaseDate),
       purchaseCost: body.purchaseCost,

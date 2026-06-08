@@ -11,6 +11,7 @@ Railway DB was unreachable during development. Migration files are committed and
 - `PurchaseOrder` + `POStatus` enum + `purchaseOrderId` on `Asset` → migration `20260605000003`
 - `AssetAdjustment` + `AdjustmentType` enum → migration `20260608000001`
 - `AssetSplit` + `splitFromId` on `Asset` → migration `20260608000002`
+- `rfidTag` on `Asset` → migration `20260608000003`
 
 ---
 
@@ -112,21 +113,39 @@ Railway DB was unreachable during development. Migration files are committed and
 
 ## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
 
-### 9. Reports: PO-wise Asset Register 🔲
-**What:** New report under Reports showing all assets grouped by purchase order, with PO value vs actual asset cost variance.
-**Complexity:** Low
+---
 
-### 10. Dashboard Improvements 🔲
-**What:** Add widgets for: open POs count, assets pending disposal approval, overdue schedules count, warranty expiring this month. Currently dashboard may be basic.
-**Complexity:** Low–Medium
+## RECENTLY COMPLETED (cont.)
 
-### 11. Mobile / PWA 🔲
-**What:** Progressive Web App support — service worker, offline capability, installable on mobile. QR scanner already works on mobile browser.
-**Complexity:** High
+### 9. Reports: PO-wise Asset Register ✅
+- New `/reports/po-register` report grouping all assets by their purchase order
+- Each PO shown as a card: supplier, status, PO date, PO value vs total linked-asset cost, with a computed variance (red if assets cost more than the PO, green if less)
+- Linked assets table per PO (code/name/category/status/cost), links to PO detail and asset detail
+- Summary header shows totals across all visible POs (respects branch-manager location scoping)
+- Files: `app/(dashboard)/reports/po-register/page.tsx`, `components/layout/sidebar.tsx`
 
-### 12. RFID Support 🔲
-**What:** RFID reader integration for bulk scanning during audits. Would replace/complement QR scanning.
-**Complexity:** High / Hardware-dependent
+### 10. Dashboard Improvements ✅
+- Added an "operational widgets" row to the dashboard with 4 new clickable KPI cards:
+  - Open Purchase Orders (status != CLOSED) → links to `/purchase-orders`
+  - Pending Disposal Approval (assets with status RETIRED awaiting disposal) → links to filtered asset list
+  - Overdue Maintenance Schedules (active schedules with `nextDueDate` in the past) → links to `/notifications`
+  - Warranty Expiring This Month (assets with `warrantyExpiry` between now and end of month) → links to `/notifications`
+- All four respect branch-manager location scoping like the existing KPIs
+- Files: `app/(dashboard)/dashboard/page.tsx`
+
+### 11. Mobile / PWA ✅
+- `app/manifest.ts` — generates a web app manifest (name, icons, theme color, standalone display, start_url `/dashboard`)
+- `public/sw.js` — service worker: precaches the offline fallback page, network-first for navigations (falls back to cache then `/offline`), cache-first for static assets (js/css/images/fonts)
+- `components/pwa/sw-register.tsx` — client component registering the service worker on mount; mounted in root layout
+- `app/offline/page.tsx` — friendly offline fallback page
+- Root layout (`app/layout.tsx`) gained `manifest`, `appleWebApp`, and `viewport.themeColor` metadata so the app is installable on mobile home screens
+- Files: `app/manifest.ts`, `public/sw.js`, `components/pwa/sw-register.tsx`, `app/offline/page.tsx`, `app/layout.tsx`
+
+### 12. RFID Support ✅
+- `Asset.rfidTag` (optional, unique) added to schema — stores the RFID tag ID associated with an asset
+- Asset form gained an "RFID Tag" input (Basic Details tab); create/update API routes persist it; asset search (`GET /api/assets?search=`) now matches on `rfidTag` (exact) and `serialNumber` (contains) in addition to name/code
+- New `/assets/rfid-scanner` page — designed for USB/Bluetooth keyboard-wedge RFID readers (the standard way commercial RFID readers integrate with web apps: they "type" the tag ID + Enter into the focused field at high speed). Captures rapid keystroke bursts (gap < 500ms = reader, longer = human typing), looks up each scanned tag automatically, and builds a running bulk-scan queue showing matched/unmatched results with links to asset detail — ideal for audit sweeps
+- Files: `app/(dashboard)/assets/rfid-scanner/page.tsx`, `components/assets/asset-form.tsx`, `app/api/assets/route.ts`, `app/api/assets/[id]/route.ts`, `components/layout/sidebar.tsx`, migration `20260608000003_add_asset_rfid_tag`
 
 ---
 

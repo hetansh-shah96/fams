@@ -21,6 +21,7 @@ const schema = z.object({
   make: z.string().optional(),
   model: z.string().optional(),
   serialNumber: z.string().optional(),
+  rfidTag: z.string().optional(),
   categoryId: z.string().min(1),
   purchaseDate: z.string().min(1),
   purchaseCost: z.number().min(0),
@@ -131,6 +132,7 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
       make: asset?.make ?? "",
       model: asset?.model ?? "",
       serialNumber: asset?.serialNumber ?? "",
+      rfidTag: asset?.rfidTag ?? "",
       categoryId: asset?.categoryId ?? "",
       purchaseDate: asset?.purchaseDate?.slice(0, 10) ?? "",
       purchaseCost: Number(asset?.purchaseCost ?? 0),
@@ -251,6 +253,10 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
                   <div className="space-y-1.5">
                     <Label>Serial Number</Label>
                     <Input {...register("serialNumber")} placeholder="e.g. SN123456789" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>RFID Tag</Label>
+                    <Input {...register("rfidTag")} placeholder="Scan or enter RFID tag ID" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Condition</Label>
