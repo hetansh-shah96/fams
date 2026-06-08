@@ -9,6 +9,7 @@ Railway DB was unreachable during development. Migration files are committed and
 - `AssetDisposal` + `DisposalMethod` enum → migration `20260605000001`
 - `MaintenanceSchedule` → migration `20260605000002`
 - `PurchaseOrder` + `POStatus` enum + `purchaseOrderId` on `Asset` → migration `20260605000003`
+- `AssetAdjustment` + `AdjustmentType` enum → migration `20260608000001`
 
 ---
 
@@ -52,27 +53,19 @@ Railway DB was unreachable during development. Migration files are committed and
 
 ---
 
-## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
+## RECENTLY COMPLETED
 
-### 5. Asset Value Adjustment / Revaluation 🔲
-**What:** Ability to revalue an asset upward or downward (write-up, write-down, cost correction, partial write-off). Required for Indian accounting compliance.
-**Schema needed:**
-```
-model AssetAdjustment {
-  id              String
-  assetId         String
-  type            AdjustmentType  // REVALUATION_UP / REVALUATION_DOWN / COST_CORRECTION / PARTIAL_WRITE_OFF
-  adjustmentDate  DateTime
-  previousCost    Decimal
-  adjustmentAmount Decimal
-  newCost         Decimal
-  reason          String
-  approvedByUserId String
-  createdAt       DateTime
-}
-```
-**UI:** "Adjust Value" button on asset detail → modal → updates `purchaseCost` on asset, logs adjustment record
-**Complexity:** Medium
+### 5. Asset Value Adjustment / Revaluation ✅
+- `AssetAdjustment` model: type (REVALUATION_UP/REVALUATION_DOWN/COST_CORRECTION/PARTIAL_WRITE_OFF), adjustment date, previous/new cost, signed adjustment amount, reason, approved by
+- `POST /api/assets/[id]/adjust` — atomically updates `Asset.purchaseCost` and creates adjustment record (rejects if asset disposed or result would be negative cost)
+- "Adjust Value" button on asset detail (admin/manager only, hidden when disposed) → modal with type/date/amount/reason and live cost preview
+- "Value Adjustment History" card on asset detail sidebar showing all past adjustments with before/after cost and approver
+- Integrated into the Timeline tab as a new "adjustment" event type (emerald dot, calculator icon)
+- Files: `app/api/assets/[id]/adjust/route.ts`, `components/assets/asset-detail-client.tsx`, migration `20260608000001_add_asset_adjustment`
+
+---
+
+## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
 
 ### 6. Bulk Operations 🔲
 **What:** Select multiple assets and perform: bulk transfer, bulk status update, bulk assign to department/location.
