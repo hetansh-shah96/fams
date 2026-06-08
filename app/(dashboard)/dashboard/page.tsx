@@ -1,9 +1,9 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AssetStatus } from "@prisma/client";
-import { addDays } from "date-fns";
+import { addDays, endOfMonth } from "date-fns";
 import Link from "next/link";
-import { Package, CheckCircle, Wrench, Clock, Archive, IndianRupee, Plus, ArrowRightLeft, ClipboardCheck, TrendingUp } from "lucide-react";
+import { Package, CheckCircle, Wrench, Clock, Archive, IndianRupee, Plus, ArrowRightLeft, ClipboardCheck, TrendingUp, ShoppingCart, AlertTriangle, ShieldAlert, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertsWidget } from "@/components/dashboard/alerts-widget";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
@@ -26,6 +26,7 @@ export default async function DashboardPage() {
     totalAssets, activeAssets, inRepairAssets, idleAssets, retiredAssets,
     grossBlock, procuredAssets,
     recentAllocations, categoryBreakdown, locationBreakdown, upcomingMaintenance,
+    openPOs, pendingDisposal, overdueSchedules, warrantyExpiring,
   ] = await Promise.all([
     prisma.asset.count({ where: locationFilter }),
     prisma.asset.count({ where: { ...locationFilter, status: AssetStatus.ACTIVE } }),
@@ -61,6 +62,21 @@ export default async function DashboardPage() {
       orderBy: { nextDueDate: "asc" },
       take: 8,
       include: { asset: { select: { id: true, assetCode: true, name: true, currentLocation: { select: { name: true } } } } },
+    }),
+    prisma.purchaseOrder.count({ where: { status: { not: "CLOSED" } } }),
+    prisma.asset.count({ where: { ...locationFilter, status: AssetStatus.RETIRED } }),
+    prisma.maintenanceSchedule.count({
+      where: {
+        isActive: true,
+        nextDueDate: { lt: new Date() },
+        ...(locationId && role === "BRANCH_MANAGER" ? { asset: { currentLocationId: locationId } } : {}),
+      },
+    }),
+    prisma.asset.count({
+      where: {
+        ...locationFilter,
+        warrantyExpiry: { gte: new Date(), lte: endOfMonth(new Date()) },
+      },
     }),
   ]);
 
@@ -159,6 +175,54 @@ export default async function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Operational widgets */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Link href="/purchase-orders">
+          <Card className="border-l-4 border-l-indigo-500 hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="p-4">
+              <div className="inline-flex p-2 rounded-lg bg-indigo-50 text-indigo-600 mb-2">
+                <ShoppingCart className="w-4 h-4" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 leading-tight">{openPOs}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Open Purchase Orders</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/assets?status=RETIRED">
+          <Card className="border-l-4 border-l-red-500 hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="p-4">
+              <div className="inline-flex p-2 rounded-lg bg-red-50 text-red-600 mb-2">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 leading-tight">{pendingDisposal}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Pending Disposal Approval</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/notifications">
+          <Card className="border-l-4 border-l-orange-500 hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="p-4">
+              <div className="inline-flex p-2 rounded-lg bg-orange-50 text-orange-600 mb-2">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 leading-tight">{overdueSchedules}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Overdue Maintenance Schedules</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/notifications">
+          <Card className="border-l-4 border-l-yellow-500 hover:shadow-md transition-shadow cursor-pointer">
+            <CardContent className="p-4">
+              <div className="inline-flex p-2 rounded-lg bg-yellow-50 text-yellow-600 mb-2">
+                <ShieldAlert className="w-4 h-4" />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 leading-tight">{warrantyExpiring}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Warranty Expiring This Month</p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

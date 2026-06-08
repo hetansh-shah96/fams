@@ -65,6 +65,7 @@ const navItems = [
     icon: FileBarChart,
     children: [
       { href: "/reports/asset-register", label: "Asset Register" },
+      { href: "/reports/po-register", label: "PO-wise Asset Register" },
       { href: "/reports/depreciation", label: "Depreciation Schedule" },
       { href: "/reports/disposal", label: "Disposal Report" },
       { href: "/reports/utilization", label: "Utilization Report" },
