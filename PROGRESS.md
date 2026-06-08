@@ -67,10 +67,20 @@ Railway DB was unreachable during development. Migration files are committed and
 
 ## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
 
-### 6. Bulk Operations 🔲
-**What:** Select multiple assets and perform: bulk transfer, bulk status update, bulk assign to department/location.
-**UI:** Checkbox column in asset list → floating action bar when items selected
-**Complexity:** Medium
+---
+
+## RECENTLY COMPLETED (cont.)
+
+### 6. Bulk Operations ✅
+- `POST /api/assets/bulk` — single endpoint handling `TRANSFER` and `STATUS_UPDATE` actions across an array of asset IDs (zod discriminated union); creates `AssetAllocation` records + audit logs per asset for transfers, skips disposed assets for status updates
+- Asset list: checkbox column (select-all + per-row), floating action bar appears when ≥1 selected showing count, "Bulk Transfer" and "Update Status" buttons, clear-selection (X)
+- `BulkTransferModal` — to-location/department/date/notes form
+- `BulkStatusModal` — status dropdown (excludes DISPOSED)
+- Files: `app/api/assets/bulk/route.ts`, `components/assets/asset-list-client.tsx`, `app/(dashboard)/assets/page.tsx` (now also queries departments)
+
+---
+
+## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
 
 ### 7. Asset Split 🔲
 **What:** Split one asset record into multiple (e.g. a batch purchase split into individual units). Original asset retired; N new assets created with proportional costs.
