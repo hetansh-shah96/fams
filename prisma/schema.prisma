@@ -113,6 +113,7 @@ model User {
   disposalsApproved      AssetDisposal[]
   adjustmentsApproved    AssetAdjustment[]
   purchaseOrdersCreated  PurchaseOrder[]
+  assetSplitsApproved    AssetSplit[]
 }
 
 model Location {
@@ -216,6 +217,7 @@ model Asset {
   customValues        Json?
   supplierId          String?
   purchaseOrderId     String?
+  splitFromId         String?
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
   createdByUserId     String
@@ -228,6 +230,9 @@ model Asset {
   createdBy         User               @relation("AssetCreator", fields: [createdByUserId], references: [id])
   supplier          Supplier?          @relation(fields: [supplierId], references: [id])
   purchaseOrder     PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  splitFrom         Asset?             @relation("SplitChildren", fields: [splitFromId], references: [id])
+  splitChildren        Asset[]               @relation("SplitChildren")
+  splitRecord          AssetSplit?           @relation("SplitParent")
   allocations          AssetAllocation[]
   depreciation         DepreciationRecord[]
   maintenance          MaintenanceLog[]
@@ -427,6 +432,19 @@ model MaintenanceSchedule {
   asset Asset @relation(fields: [assetId], references: [id])
 
   @@unique([assetId, serviceType])
+}
+
+model AssetSplit {
+  id               String   @id @default(cuid())
+  parentAssetId    String   @unique
+  splitDate        DateTime
+  reason           String
+  childCount       Int
+  approvedByUserId String
+  createdAt        DateTime @default(now())
+
+  parentAsset Asset @relation("SplitParent", fields: [parentAssetId], references: [id])
+  approvedBy  User  @relation(fields: [approvedByUserId], references: [id])
 }
 
 enum AdjustmentType {

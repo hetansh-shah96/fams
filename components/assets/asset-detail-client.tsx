@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit, QrCode, ArrowRightLeft, Wrench, Calculator, Download, ClipboardCheck, Package, Clock, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit, QrCode, ArrowRightLeft, Wrench, Calculator, SplitSquareHorizontal, Download, ClipboardCheck, Package, Clock, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import QRCodeDisplay from "@/components/assets/qr-code-display";
 
@@ -109,6 +109,14 @@ interface Asset {
     reason: string;
     approvedBy: { name: string };
   }[];
+  splitFrom: { id: string; assetCode: string; name: string } | null;
+  splitChildren: { id: string; assetCode: string; name: string; purchaseCost: string }[];
+  splitRecord: {
+    splitDate: string;
+    reason: string;
+    childCount: number;
+    approvedBy: { name: string };
+  } | null;
   maintenanceSchedules: {
     id: string;
     serviceType: string;
@@ -134,8 +142,10 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
   const [showQR, setShowQR] = useState(false);
   const [showDispose, setShowDispose] = useState(false);
   const [showAdjust, setShowAdjust] = useState(false);
+  const [showSplit, setShowSplit] = useState(false);
 
   const isDisposed = asset.status === "DISPOSED";
+  const canSplit = canEdit && !isDisposed && !asset.splitRecord;
 
   return (
     <div className="space-y-6">
@@ -158,6 +168,11 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
               <Button variant="outline" size="sm" onClick={() => setShowAdjust(true)}>
                 <Calculator className="w-4 h-4 mr-2" />Adjust Value
               </Button>
+              {canSplit && (
+                <Button variant="outline" size="sm" onClick={() => setShowSplit(true)}>
+                  <SplitSquareHorizontal className="w-4 h-4 mr-2" />Split Asset
+                </Button>
+              )}
               <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setShowDispose(true)}>
                 <Trash2 className="w-4 h-4 mr-2" />Dispose
               </Button>
@@ -184,6 +199,14 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
           asset={asset}
           onClose={() => setShowAdjust(false)}
           onSuccess={() => { setShowAdjust(false); router.refresh(); }}
+        />
+      )}
+
+      {showSplit && (
+        <SplitModal
+          asset={asset}
+          onClose={() => setShowSplit(false)}
+          onSuccess={() => { setShowSplit(false); router.refresh(); }}
         />
       )}
 
@@ -281,6 +304,46 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
                     <p className="text-xs text-gray-400 mt-0.5">Approved by {adj.approvedBy.name}</p>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {asset.splitFrom && (
+            <Card className="border-blue-200 bg-blue-50/40">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base text-blue-700 flex items-center gap-2">
+                  <SplitSquareHorizontal className="w-4 h-4" />Split From
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Link href={`/assets/${asset.splitFrom.id}`} className="text-sm text-blue-700 hover:underline font-mono">
+                  {asset.splitFrom.assetCode}
+                </Link>
+                <p className="text-sm text-gray-600 mt-0.5">{asset.splitFrom.name}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {asset.splitRecord && (
+            <Card className="border-blue-200 bg-blue-50/40">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base text-blue-700 flex items-center gap-2">
+                  <SplitSquareHorizontal className="w-4 h-4" />Split Into {asset.splitRecord.childCount} Assets
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <InfoRow label="Split Date" value={format(new Date(asset.splitRecord.splitDate), "dd MMM yyyy")} />
+                <InfoRow label="Reason" value={asset.splitRecord.reason} />
+                <InfoRow label="Approved By" value={asset.splitRecord.approvedBy.name} />
+                <div className="mt-2 space-y-1.5">
+                  {asset.splitChildren.map((c) => (
+                    <Link key={c.id} href={`/assets/${c.id}`} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2 hover:bg-blue-50">
+                      <span className="font-mono text-blue-700">{c.assetCode}</span>
+                      <span className="text-gray-600 truncate mx-2">{c.name}</span>
+                      <span className="text-gray-500">₹{Number(c.purchaseCost).toLocaleString("en-IN")}</span>
+                    </Link>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -1004,6 +1067,151 @@ function AdjustModal({ asset, onClose, onSuccess }: {
             </Button>
             <Button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
               {loading ? "Processing…" : "Confirm Adjustment"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+type SplitChildRow = { name: string; purchaseCost: string; serialNumber: string };
+
+function SplitModal({ asset, onClose, onSuccess }: {
+  asset: Asset;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [splitDate, setSplitDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [reason, setReason] = useState("");
+  const [children, setChildren] = useState<SplitChildRow[]>([
+    { name: "", purchaseCost: "", serialNumber: "" },
+    { name: "", purchaseCost: "", serialNumber: "" },
+  ]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const totalCost = children.reduce((sum, c) => sum + (Number(c.purchaseCost) || 0), 0);
+  const parentCost = Number(asset.purchaseCost);
+
+  function updateChild(i: number, field: keyof SplitChildRow, value: string) {
+    setChildren((prev) => prev.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)));
+  }
+
+  function addChild() {
+    setChildren((prev) => [...prev, { name: "", purchaseCost: "", serialNumber: "" }]);
+  }
+
+  function removeChild(i: number) {
+    setChildren((prev) => (prev.length > 2 ? prev.filter((_, idx) => idx !== i) : prev));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/split`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          splitDate,
+          reason,
+          children: children.map((c) => ({
+            name: c.name,
+            purchaseCost: Number(c.purchaseCost) || 0,
+            serialNumber: c.serialNumber || undefined,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to split asset");
+        return;
+      }
+      onSuccess();
+    } catch {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Split Asset</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          <span className="font-mono text-orange-600">{asset.assetCode}</span> · {asset.name} will be retired and replaced by the assets below
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Split Date</label>
+              <input type="date" value={splitDate} onChange={(e) => setSplitDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+              <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for splitting" className="w-full border rounded-lg px-3 py-2 text-sm" required />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">New Assets ({children.length})</label>
+              <Button type="button" variant="outline" size="sm" onClick={addChild}>+ Add Asset</Button>
+            </div>
+            <div className="space-y-2">
+              {children.map((c, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                  <input
+                    type="text"
+                    value={c.name}
+                    onChange={(e) => updateChild(i, "name", e.target.value)}
+                    placeholder="Asset name"
+                    className="col-span-5 border rounded-lg px-3 py-2 text-sm"
+                    required
+                  />
+                  <input
+                    type="text"
+                    value={c.serialNumber}
+                    onChange={(e) => updateChild(i, "serialNumber", e.target.value)}
+                    placeholder="Serial no. (optional)"
+                    className="col-span-3 border rounded-lg px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={c.purchaseCost}
+                    onChange={(e) => updateChild(i, "purchaseCost", e.target.value)}
+                    placeholder="Cost (₹)"
+                    className="col-span-3 border rounded-lg px-3 py-2 text-sm"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeChild(i)}
+                    disabled={children.length <= 2}
+                    className="col-span-1 text-gray-400 hover:text-red-600 disabled:opacity-30 flex justify-center"
+                    aria-label="Remove"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className={`text-xs mt-2 ${Math.abs(totalCost - parentCost) > 0.01 ? "text-orange-600" : "text-gray-500"}`}>
+              New assets total ₹{totalCost.toLocaleString("en-IN")} · Original cost ₹{parentCost.toLocaleString("en-IN")}
+              {Math.abs(totalCost - parentCost) > 0.01 && " — totals don't match, please verify"}
+            </p>
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
+              {loading ? "Processing…" : "Confirm Split"}
             </Button>
           </div>
         </form>

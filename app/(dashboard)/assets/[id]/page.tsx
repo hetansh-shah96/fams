@@ -48,6 +48,11 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         orderBy: { adjustmentDate: "desc" },
         include: { approvedBy: { select: { name: true } } },
       },
+      splitFrom: { select: { id: true, assetCode: true, name: true } },
+      splitChildren: { select: { id: true, assetCode: true, name: true, purchaseCost: true } },
+      splitRecord: {
+        include: { approvedBy: { select: { name: true } } },
+      },
       maintenanceSchedules: {
         orderBy: { nextDueDate: "asc" },
       },
