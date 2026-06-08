@@ -10,6 +10,7 @@ Railway DB was unreachable during development. Migration files are committed and
 - `MaintenanceSchedule` → migration `20260605000002`
 - `PurchaseOrder` + `POStatus` enum + `purchaseOrderId` on `Asset` → migration `20260605000003`
 - `AssetAdjustment` + `AdjustmentType` enum → migration `20260608000001`
+- `AssetSplit` + `splitFromId` on `Asset` → migration `20260608000002`
 
 ---
 
@@ -82,10 +83,20 @@ Railway DB was unreachable during development. Migration files are committed and
 
 ## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
 
-### 7. Asset Split 🔲
-**What:** Split one asset record into multiple (e.g. a batch purchase split into individual units). Original asset retired; N new assets created with proportional costs.
-**Schema needed:** `AssetSplit` model linking parent → children assets
-**Complexity:** High
+---
+
+## RECENTLY COMPLETED (cont.)
+
+### 7. Asset Split ✅
+- `AssetSplit` model: parent asset (unique), split date, reason, child count, approved by; `Asset.splitFromId` self-relation links each child back to its parent
+- `POST /api/assets/[id]/split` — generates N new asset records (new codes via `generateAssetCode`, inherit category/location/department/supplier/PO from parent), retires the parent (`status: RETIRED`), creates the `AssetSplit` record, audit logs (rejects disposed assets or assets already split)
+- "Split Asset" button on asset detail (admin/manager, hidden once disposed/already split) → modal with dynamic add/remove rows for child name/serial/cost, live total-vs-original cost comparison
+- Asset detail sidebar: "Split From" card (for children, links to parent) and "Split Into N Assets" card (for parents, lists all children with cost and links)
+- Files: `app/api/assets/[id]/split/route.ts`, `components/assets/asset-detail-client.tsx`, migration `20260608000002_add_asset_split`
+
+---
+
+## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
 
 ### 8. Enhanced Supplier Page 🔲
 **What:** Supplier detail page showing: all linked POs (with totals), all linked assets, supplier performance summary (total spend, asset count, avg warranty hit rate).
