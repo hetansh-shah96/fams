@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Download, QrCode, ChevronLeft, ChevronRight, Tag } from "lucide-react";
+import { Plus, Search, Download, QrCode, ChevronLeft, ChevronRight, Tag, ArrowRightLeft, RefreshCw, X } from "lucide-react";
 import { format } from "date-fns";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -52,14 +52,34 @@ interface Props {
   pageSize: number;
   categories: { id: string; name: string }[];
   locations: { id: string; name: string }[];
+  departments: { id: string; name: string }[];
   role: string;
 }
 
-export function AssetListClient({ assets, total, page, pageSize, categories, locations, role }: Props) {
+export function AssetListClient({ assets, total, page, pageSize, categories, locations, departments, role }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkModal, setBulkModal] = useState<"transfer" | "status" | null>(null);
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected((prev) => (prev.size === assets.length ? new Set() : new Set(assets.map((a) => a.id))));
+  }
+
+  function clearSelection() {
+    setSelected(new Set());
+  }
 
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(sp.toString());
@@ -161,6 +181,16 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
           <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b">
+                {canWrite && (
+                  <th className="px-4 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={assets.length > 0 && selected.size === assets.length}
+                      onChange={toggleAll}
+                      className="rounded border-gray-300"
+                    />
+                  </th>
+                )}
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Asset Code</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Name</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Category</th>
@@ -177,14 +207,24 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
             <tbody>
               {assets.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-12 text-gray-400">No assets found</td>
+                  <td colSpan={canWrite ? 12 : 11} className="text-center py-12 text-gray-400">No assets found</td>
                 </tr>
               ) : (
                 assets.map((asset, i) => (
                   <tr
                     key={asset.id}
-                    className={`border-b last:border-0 hover:bg-orange-50 transition-colors ${i % 2 === 1 ? "bg-amber-50/30" : ""}`}
+                    className={`border-b last:border-0 hover:bg-orange-50 transition-colors ${selected.has(asset.id) ? "bg-orange-50" : i % 2 === 1 ? "bg-amber-50/30" : ""}`}
                   >
+                    {canWrite && (
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(asset.id)}
+                          onChange={() => toggleOne(asset.id)}
+                          className="rounded border-gray-300"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-mono text-xs text-blue-700 font-semibold">{asset.assetCode}</td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{asset.name}</p>
@@ -242,6 +282,180 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
             </div>
           </div>
         )}
+      </div>
+
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 bg-gray-900 text-white rounded-xl shadow-xl px-5 py-3 flex items-center gap-4">
+          <span className="text-sm font-medium">{selected.size} selected</span>
+          <Button size="sm" variant="outline" className="bg-transparent border-gray-600 text-white hover:bg-gray-800" onClick={() => setBulkModal("transfer")}>
+            <ArrowRightLeft className="w-4 h-4 mr-2" />Bulk Transfer
+          </Button>
+          <Button size="sm" variant="outline" className="bg-transparent border-gray-600 text-white hover:bg-gray-800" onClick={() => setBulkModal("status")}>
+            <RefreshCw className="w-4 h-4 mr-2" />Update Status
+          </Button>
+          <button onClick={clearSelection} className="text-gray-400 hover:text-white" aria-label="Clear selection">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {bulkModal === "transfer" && (
+        <BulkTransferModal
+          assetIds={[...selected]}
+          locations={locations}
+          departments={departments}
+          onClose={() => setBulkModal(null)}
+          onSuccess={() => { setBulkModal(null); clearSelection(); router.refresh(); }}
+        />
+      )}
+
+      {bulkModal === "status" && (
+        <BulkStatusModal
+          assetIds={[...selected]}
+          onClose={() => setBulkModal(null)}
+          onSuccess={() => { setBulkModal(null); clearSelection(); router.refresh(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+const BULK_STATUSES = ["PROCURED", "IN_TRANSIT", "ACTIVE", "IN_REPAIR", "IDLE", "RETIRED"] as const;
+
+function BulkTransferModal({ assetIds, locations, departments, onClose, onSuccess }: {
+  assetIds: string[];
+  locations: { id: string; name: string }[];
+  departments: { id: string; name: string }[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [toLocationId, setToLocationId] = useState("");
+  const [toDepartmentId, setToDepartmentId] = useState("");
+  const [transferDate, setTransferDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!toLocationId || !toDepartmentId) {
+      setError("Location and department are required");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/assets/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "TRANSFER", assetIds, toLocationId, toDepartmentId, transferDate, notes }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to transfer assets");
+        return;
+      }
+      onSuccess();
+    } catch {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Bulk Transfer</h2>
+        <p className="text-sm text-gray-500 mb-4">Transferring {assetIds.length} asset{assetIds.length === 1 ? "" : "s"}</p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">To Location</label>
+            <select value={toLocationId} onChange={(e) => setToLocationId(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required>
+              <option value="">Select location</option>
+              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">To Department</label>
+            <select value={toDepartmentId} onChange={(e) => setToDepartmentId(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required>
+              <option value="">Select department</option>
+              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Transfer Date</label>
+            <input type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Optional notes" className="w-full border rounded-lg px-3 py-2 text-sm resize-none" />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
+              {loading ? "Processing…" : "Confirm Transfer"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BulkStatusModal({ assetIds, onClose, onSuccess }: {
+  assetIds: string[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [status, setStatus] = useState<string>("ACTIVE");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/assets/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "STATUS_UPDATE", assetIds, status }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? "Failed to update status");
+        return;
+      }
+      onSuccess();
+    } catch {
+      setError("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Bulk Status Update</h2>
+        <p className="text-sm text-gray-500 mb-4">Updating {assetIds.length} asset{assetIds.length === 1 ? "" : "s"} (disposed assets are skipped)</p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" required>
+              {BULK_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+            </select>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
+              {loading ? "Processing…" : "Confirm Update"}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );

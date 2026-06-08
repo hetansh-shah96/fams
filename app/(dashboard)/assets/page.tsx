@@ -39,7 +39,7 @@ export default async function AssetsPage({
   if (categoryId) where.categoryId = categoryId;
   if (locationId && role !== "BRANCH_MANAGER") where.currentLocationId = locationId;
 
-  const [assets, total, categories, locations] = await Promise.all([
+  const [assets, total, categories, locations, departments] = await Promise.all([
     prisma.asset.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -55,6 +55,7 @@ export default async function AssetsPage({
     prisma.asset.count({ where }),
     prisma.assetCategory.findMany({ orderBy: { name: "asc" } }),
     prisma.location.findMany({ orderBy: { name: "asc" } }),
+    prisma.department.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -65,6 +66,7 @@ export default async function AssetsPage({
       pageSize={pageSize}
       categories={categories}
       locations={locations}
+      departments={departments}
       role={role}
     />
   );
