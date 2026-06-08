@@ -98,9 +98,19 @@ Railway DB was unreachable during development. Migration files are committed and
 
 ## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
 
-### 8. Enhanced Supplier Page 🔲
-**What:** Supplier detail page showing: all linked POs (with totals), all linked assets, supplier performance summary (total spend, asset count, avg warranty hit rate).
-**Complexity:** Low–Medium (mostly UI, data already exists via relations)
+---
+
+## RECENTLY COMPLETED (cont.)
+
+### 8. Enhanced Supplier Page ✅
+- New `/settings/suppliers/[id]` detail page (server-rendered, queries supplier with linked assets + POs)
+- `SupplierDetailClient`: stat cards (total asset spend, PO count/value, linked asset count, warranty coverage %), supplier contact info card, linked Purchase Orders table (links to PO detail), linked Assets table (links to asset detail) with status badges
+- `MasterCrud` component gained an optional `getViewHref` prop — renders an "Eye" view-link button per row; wired up on the suppliers list page
+- Files: `app/(dashboard)/settings/suppliers/[id]/page.tsx`, `components/settings/supplier-detail-client.tsx`, `components/settings/master-crud.tsx`, `app/(dashboard)/settings/suppliers/page.tsx`
+
+---
+
+## REMAINING FEATURES (from gap analysis vs AssetThread / Paessler)
 
 ### 9. Reports: PO-wise Asset Register 🔲
 **What:** New report under Reports showing all assets grouped by purchase order, with PO value vs actual asset cost variance.
