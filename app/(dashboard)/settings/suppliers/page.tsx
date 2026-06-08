@@ -15,7 +15,7 @@ const FIELDS = [
 ];
 
 export default function SuppliersPage() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<Record<string, unknown>[]>([]);
 
   async function load() {
     const res = await fetch("/api/settings/suppliers");
@@ -31,6 +31,7 @@ export default function SuppliersPage() {
       fields={FIELDS}
       apiPath="/api/settings/suppliers"
       onRefresh={load}
+      getViewHref={(item) => `/settings/suppliers/${item.id}`}
     />
   );
 }

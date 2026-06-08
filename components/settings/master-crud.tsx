@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye } from "lucide-react";
+import Link from "next/link";
 
 export interface FieldDef {
   key: string;
@@ -25,11 +26,12 @@ interface Props<T extends Record<string, unknown>> {
   canCreate?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
+  getViewHref?: (item: T) => string;
 }
 
 export function MasterCrud<T extends Record<string, unknown>>({
   title, items, fields, apiPath, onRefresh,
-  canCreate = true, canEdit = true, canDelete = true,
+  canCreate = true, canEdit = true, canDelete = true, getViewHref,
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
@@ -110,7 +112,7 @@ export function MasterCrud<T extends Record<string, unknown>>({
               {fields.map(f => (
                 <th key={f.key} className="text-left px-4 py-3 font-semibold text-gray-600">{f.label}</th>
               ))}
-              {(canEdit || canDelete) && <th className="px-4 py-3 w-28" />}
+              {(canEdit || canDelete || getViewHref) && <th className="px-4 py-3 w-28" />}
             </tr>
           </thead>
           <tbody>
@@ -122,7 +124,7 @@ export function MasterCrud<T extends Record<string, unknown>>({
                   {fields.map(f => (
                     <td key={f.key} className="px-4 py-3 text-gray-700">{String(item[f.key] ?? "—")}</td>
                   ))}
-                  {(canEdit || canDelete) && (
+                  {(canEdit || canDelete || getViewHref) && (
                     <td className="px-4 py-3">
                       {confirmId === String(item.id) ? (
                         <div className="flex items-center gap-1">
@@ -145,6 +147,13 @@ export function MasterCrud<T extends Record<string, unknown>>({
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
+                          {getViewHref && (
+                            <Link href={getViewHref(item)}>
+                              <Button variant="ghost" size="sm">
+                                <Eye className="w-3.5 h-3.5" />
+                              </Button>
+                            </Link>
+                          )}
                           {canEdit && (
                             <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>
                               <Pencil className="w-3.5 h-3.5" />
