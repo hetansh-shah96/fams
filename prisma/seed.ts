@@ -187,12 +187,17 @@ const CA_CATEGORIES = [
 async function main() {
   console.log("Seeding…");
 
-  // ── Company ───────────────────────────────────────────────────────────────
-  const company = await prisma.company.upsert({
-    where: { code: "DEMO-CO" },
-    update: {},
-    create: { code: "DEMO-CO", name: "Demo Company Pvt. Ltd.", city: "Mumbai", state: "Maharashtra", country: "India" },
-  });
+  // ── Company — use existing if present, otherwise create a default ────────
+  // This prevents creating a "Demo Company" that conflicts with user's real data
+  let company = await prisma.company.findFirst({ orderBy: { createdAt: "asc" } });
+  if (!company) {
+    company = await prisma.company.create({
+      data: { code: "DEMO-CO", name: "Demo Company Pvt. Ltd.", city: "Mumbai", state: "Maharashtra", country: "India" },
+    });
+    console.log("  Created default company (no existing company found).");
+  } else {
+    console.log(`  Using existing company: ${company.name} (${company.code})`);
+  }
 
   // ── Locations ────────────────────────────────────────────────────────────
   const mumbai = await prisma.location.upsert({
