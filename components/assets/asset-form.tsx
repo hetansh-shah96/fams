@@ -299,7 +299,7 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
               {/* ── Tab 2: Classification ── */}
               <TabsContent value="classification" className="p-6">
                 <p className="text-xs text-gray-400 mb-5">
-                  Select the asset classification under <strong>two separate frameworks</strong>: Companies Act 2013 (for SLM depreciation) and Income Tax Act (for WDV block depreciation).
+                  Select the asset classification under <strong>two separate frameworks</strong>: Income Tax Act (for WDV block depreciation) and Companies Act 2013 (for WDV depreciation).
                 </p>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -307,7 +307,7 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
                   <div className="rounded-xl border border-orange-200 bg-orange-50/40 p-5 space-y-4">
                     <div>
                       <p className="text-xs font-bold text-orange-700 uppercase tracking-wide">Companies Act 2013 — Schedule II</p>
-                      <p className="text-xs text-orange-600 mt-0.5">SLM · Straight Line Method · Useful life in years</p>
+                      <p className="text-xs text-orange-600 mt-0.5">WDV · Written Down Value · Useful life in years</p>
                     </div>
 
                     <div className="space-y-1.5">
@@ -345,9 +345,8 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
                     {selectedCategory && (
                       <div className="bg-white rounded-lg border border-orange-100 p-3 space-y-1.5 text-sm">
                         <div className="flex justify-between"><span className="text-gray-500">Useful Life</span><span className="font-semibold text-orange-700">{selectedCategory.usefulLifeCompaniesAct} years</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">CA Method</span><span className="font-medium">{selectedCategory.depreciationMethod === "SLM" ? "Straight Line (SLM)" : "Written Down Value (WDV)"}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">CA Method</span><span className="font-medium text-purple-700">Written Down Value (WDV)</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Asset Type</span><span className="font-medium">{selectedCategory.isIntangible ? "Intangible" : "Tangible"}</span></div>
-                        <div className="flex justify-between text-xs text-gray-400"><span>Annual SLM rate ≈</span><span>{selectedCategory.usefulLifeCompaniesAct > 0 ? (100 / selectedCategory.usefulLifeCompaniesAct).toFixed(2) : "—"}%</span></div>
                       </div>
                     )}
                   </div>
@@ -455,7 +454,7 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
                     <Label>Residual / Scrap Value (₹) <span className="text-red-500">*</span></Label>
                     <Input type="number" step="0.01" min="0" {...register("residualValue", { valueAsNumber: true })} placeholder="0.00" />
                     {errors.residualValue && <p className="text-xs text-red-500">Required</p>}
-                    <p className="text-xs text-gray-400">Expected value at end of useful life (SLM stops depreciating at this value)</p>
+                    <p className="text-xs text-gray-400">Expected value at end of useful life (depreciation stops at this value; minimum 5% of cost)</p>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Invoice / Bill Number</Label>

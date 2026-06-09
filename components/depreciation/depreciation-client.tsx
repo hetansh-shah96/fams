@@ -165,13 +165,13 @@ export function DepreciationClient({ assets, records, itActBlocks, fyList, selec
       {header}
       {runResultPanel}
 
-      <Tabs defaultValue="ca">
+      <Tabs defaultValue="it">
         <TabsList variant="line" className="mb-4">
-          <TabsTrigger value="ca" className="px-5 py-2.5 text-sm">
-            Companies Act 2013 — SLM
-          </TabsTrigger>
           <TabsTrigger value="it" className="px-5 py-2.5 text-sm">
             Income Tax Act — Block of Assets (WDV)
+          </TabsTrigger>
+          <TabsTrigger value="ca" className="px-5 py-2.5 text-sm">
+            Companies Act 2013 — WDV
           </TabsTrigger>
         </TabsList>
 
@@ -190,7 +190,7 @@ export function DepreciationClient({ assets, records, itActBlocks, fyList, selec
 
           <div className="bg-white rounded-xl border overflow-hidden">
             <div className="px-4 py-2.5 bg-orange-50 border-b">
-              <p className="text-xs text-orange-700 font-medium">Schedule II, Companies Act 2013 · Straight Line Method (SLM) · Depreciation = (Cost − Residual Value) ÷ Useful Life · Pro-rated for days in service</p>
+              <p className="text-xs text-orange-700 font-medium">Schedule II, Companies Act 2013 · Written Down Value (WDV) · Rate derived from useful life: r = 1 − (Residual/Cost)^(1/n) · Pro-rated for days in service</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[750px]">
