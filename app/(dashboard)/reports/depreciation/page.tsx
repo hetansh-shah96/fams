@@ -11,7 +11,7 @@ import { ReportFilters } from "@/components/reports/report-filters";
 export default async function DepreciationReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ fy?: string; categoryId?: string; locationId?: string }>;
+  searchParams: Promise<{ fy?: string; itActBlockId?: string; locationId?: string }>;
 }) {
   const session = await auth();
   if (!["SUPER_ADMIN", "BRANCH_MANAGER"].includes(session!.user.role)) redirect("/dashboard");
@@ -19,14 +19,14 @@ export default async function DepreciationReportPage({
   const sp = await searchParams;
   const fy = sp.fy ?? getCurrentIndianFY();
 
-  const [categories, locations] = await Promise.all([
-    prisma.assetCategory.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  const [itActBlocks, locations] = await Promise.all([
+    prisma.itActBlock.findMany({ where: { isActive: true }, orderBy: { code: "asc" }, select: { id: true, name: true, code: true } }),
     prisma.location.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const depWhere = {
     financialYear: fy,
-    ...(sp.categoryId ? { asset: { categoryId: sp.categoryId } } : {}),
+    ...(sp.itActBlockId ? { asset: { itActBlockId: sp.itActBlockId } } : {}),
     ...(sp.locationId ? { asset: { currentLocationId: sp.locationId } } : {}),
   };
 
@@ -91,9 +91,9 @@ export default async function DepreciationReportPage({
 
       {/* Filters */}
       <ReportFilters
-        categories={categories}
+        itActBlocks={itActBlocks}
         locations={locations}
-        current={{ categoryId: sp.categoryId, locationId: sp.locationId }}
+        current={{ itActBlockId: sp.itActBlockId, locationId: sp.locationId }}
       />
 
       {records.length === 0 && (

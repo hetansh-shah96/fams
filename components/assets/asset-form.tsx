@@ -278,7 +278,7 @@ export function AssetForm({ categories, itActBlocks, locations, departments, sup
                         <SelectDisplay value={selectedStatus}>{selectedStatus.replace(/_/g, " ")}</SelectDisplay>
                       </SelectTrigger>
                       <SelectContent>
-                        {["PROCURED", "IN_TRANSIT", "ACTIVE", "IN_REPAIR", "IDLE", "RETIRED", "DISPOSED"].map(s => (
+                        {["IN_TRANSIT", "ACTIVE", "IN_REPAIR", "IDLE", "RETIRED", "DISPOSED"].map(s => (
                           <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>
                         ))}
                       </SelectContent>

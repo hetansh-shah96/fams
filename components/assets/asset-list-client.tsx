@@ -50,13 +50,13 @@ interface Props {
   total: number;
   page: number;
   pageSize: number;
-  categories: { id: string; name: string }[];
+  itActBlocks: { id: string; name: string; code: string }[];
   locations: { id: string; name: string }[];
   departments: { id: string; name: string }[];
   role: string;
 }
 
-export function AssetListClient({ assets, total, page, pageSize, categories, locations, departments, role }: Props) {
+export function AssetListClient({ assets, total, page, pageSize, itActBlocks, locations, departments, role }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -144,19 +144,19 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All Status</SelectItem>
-            {["PROCURED","IN_TRANSIT","ACTIVE","IN_REPAIR","IDLE","RETIRED","DISPOSED"].map((s) => (
+            {["IN_TRANSIT","ACTIVE","IN_REPAIR","IDLE","RETIRED","DISPOSED"].map((s) => (
               <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select defaultValue={sp.get("categoryId") ?? ""} onValueChange={(v: string | null) => updateParam("categoryId", (v ?? "ALL") === "ALL" ? "" : (v ?? ""))}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Category" />
+        <Select defaultValue={sp.get("itActBlockId") ?? ""} onValueChange={(v: string | null) => updateParam("itActBlockId", (v ?? "ALL") === "ALL" ? "" : (v ?? ""))}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="IT Act Block" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All Categories</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
+            <SelectItem value="ALL">All IT Act Blocks</SelectItem>
+            {itActBlocks.map((b) => (
+              <SelectItem key={b.id} value={b.id} label={b.name}>{b.code} — {b.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -320,7 +320,7 @@ export function AssetListClient({ assets, total, page, pageSize, categories, loc
   );
 }
 
-const BULK_STATUSES = ["PROCURED", "IN_TRANSIT", "ACTIVE", "IN_REPAIR", "IDLE", "RETIRED"] as const;
+const BULK_STATUSES = ["IN_TRANSIT", "ACTIVE", "IN_REPAIR", "IDLE", "RETIRED"] as const;
 
 function BulkTransferModal({ assetIds, locations, departments, onClose, onSuccess }: {
   assetIds: string[];

@@ -14,7 +14,7 @@ export default async function AssetsPage({
   const pageSize = 20;
   const search = sp.search ?? "";
   const status = sp.status ?? "";
-  const categoryId = sp.categoryId ?? "";
+  const itActBlockId = sp.itActBlockId ?? "";
   const locationId = sp.locationId ?? "";
 
   const role = session!.user.role;
@@ -36,10 +36,10 @@ export default async function AssetsPage({
     ];
   }
   if (status) where.status = status;
-  if (categoryId) where.categoryId = categoryId;
+  if (itActBlockId) where.itActBlockId = itActBlockId;
   if (locationId && role !== "BRANCH_MANAGER") where.currentLocationId = locationId;
 
-  const [assets, total, categories, locations, departments] = await Promise.all([
+  const [assets, total, itActBlocks, locations, departments] = await Promise.all([
     prisma.asset.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -47,13 +47,14 @@ export default async function AssetsPage({
       take: pageSize,
       include: {
         category: true,
+        itActBlock: true,
         currentLocation: true,
         currentDepartment: true,
         assignedUser: { select: { name: true } },
       },
     }),
     prisma.asset.count({ where }),
-    prisma.assetCategory.findMany({ orderBy: { name: "asc" } }),
+    prisma.itActBlock.findMany({ where: { isActive: true }, orderBy: { code: "asc" } }),
     prisma.location.findMany({ orderBy: { name: "asc" } }),
     prisma.department.findMany({ orderBy: { name: "asc" } }),
   ]);
@@ -64,7 +65,7 @@ export default async function AssetsPage({
       total={total}
       page={page}
       pageSize={pageSize}
-      categories={categories}
+      itActBlocks={itActBlocks}
       locations={locations}
       departments={departments}
       role={role}

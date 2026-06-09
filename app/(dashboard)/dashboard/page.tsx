@@ -3,8 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { AssetStatus } from "@prisma/client";
 import { addDays, endOfMonth } from "date-fns";
 import Link from "next/link";
-import { Package, CheckCircle, Wrench, Clock, Archive, IndianRupee, Plus, ArrowRightLeft, ClipboardCheck, TrendingUp, ShoppingCart, AlertTriangle, ShieldAlert, Trash2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Package, CheckCircle, Wrench, Clock,
+  IndianRupee, Plus, ArrowRightLeft, ClipboardCheck,
+  ShoppingCart, AlertTriangle, ShieldAlert, Trash2,
+} from "lucide-react";
 import { AlertsWidget } from "@/components/dashboard/alerts-widget";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { GroupedBarChart } from "@/components/dashboard/grouped-bar-chart";
@@ -24,7 +27,7 @@ export default async function DashboardPage() {
 
   const [
     totalAssets, activeAssets, inRepairAssets, idleAssets, retiredAssets,
-    grossBlock, procuredAssets,
+    grossBlock, procuredAssets, inTransitAssets,
     recentAllocations, categoryBreakdown, locationBreakdown, upcomingMaintenance,
     openPOs, pendingDisposal, overdueSchedules, warrantyExpiring,
   ] = await Promise.all([
@@ -35,6 +38,7 @@ export default async function DashboardPage() {
     prisma.asset.count({ where: { ...locationFilter, status: AssetStatus.RETIRED } }),
     prisma.asset.aggregate({ where: locationFilter, _sum: { purchaseCost: true } }),
     prisma.asset.count({ where: { ...locationFilter, status: AssetStatus.PROCURED } }),
+    prisma.asset.count({ where: { ...locationFilter, status: AssetStatus.IN_TRANSIT } }),
     prisma.assetAllocation.findMany({
       where: locationFilter.currentLocationId ? { toLocationId: locationFilter.currentLocationId } : {},
       orderBy: { createdAt: "desc" },
@@ -82,8 +86,8 @@ export default async function DashboardPage() {
 
   const grossBlockValue = Number(grossBlock._sum.purchaseCost ?? 0);
   const activeRate = totalAssets > 0 ? Math.round((activeAssets / totalAssets) * 100) : 0;
+  const otherAssets = procuredAssets + inTransitAssets + retiredAssets;
 
-  // Group categories by their CA group for the chart
   const groupMap = categoryBreakdown.reduce<Record<string, number>>((acc, cat) => {
     const key = cat.group ?? cat.name;
     acc[key] = (acc[key] ?? 0) + cat._count.assets;
@@ -99,17 +103,29 @@ export default async function DashboardPage() {
     .filter(l => l._count.assetsAtLocation > 0)
     .map(l => ({ name: l.name, value: l._count.assetsAtLocation, id: l.id }));
 
-  const kpis = [
-    { label: "Total Assets",  value: totalAssets,      href: "/assets",                       icon: Package,     color: "text-blue-600",   bg: "bg-blue-50",   border: "border-l-blue-500"   },
-    { label: "Active",        value: activeAssets,     href: "/assets?status=ACTIVE",         icon: CheckCircle, color: "text-green-600",  bg: "bg-green-50",  border: "border-l-green-500"  },
-    { label: "In Repair",     value: inRepairAssets,   href: "/assets?status=IN_REPAIR",      icon: Wrench,      color: "text-orange-600", bg: "bg-orange-50", border: "border-l-orange-500" },
-    { label: "Idle",          value: idleAssets,       href: "/assets?status=IDLE",           icon: Clock,       color: "text-yellow-600", bg: "bg-yellow-50", border: "border-l-yellow-500" },
-    { label: "Procured",      value: procuredAssets,   href: "/assets?status=PROCURED",       icon: Archive,     color: "text-cyan-600",   bg: "bg-cyan-50",   border: "border-l-cyan-500"   },
-    { label: "Gross Block",   value: fmt(grossBlockValue), href: "/reports/asset-register",  icon: IndianRupee, color: "text-purple-600", bg: "bg-purple-50", border: "border-l-purple-500" },
-  ];
+  const hasAlerts = overdueSchedules > 0 || warrantyExpiring > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Alert strip */}
+      {hasAlerts && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-orange-500 flex-shrink-0" />
+          <div className="text-sm text-orange-800 flex flex-wrap gap-x-4 gap-y-1">
+            {overdueSchedules > 0 && (
+              <Link href="/notifications" className="hover:underline font-medium">
+                {overdueSchedules} overdue maintenance schedule{overdueSchedules !== 1 ? "s" : ""}
+              </Link>
+            )}
+            {warrantyExpiring > 0 && (
+              <Link href="/notifications" className="hover:underline font-medium">
+                {warrantyExpiring} warranty expiring this month
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
         <div>
@@ -135,96 +151,116 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Cards — each clickable */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {kpis.map((k) => (
-          <Link key={k.label} href={k.href}>
-            <Card className={`border-l-4 ${k.border} hover:shadow-md transition-shadow cursor-pointer`}>
-              <CardContent className="p-4">
-                <div className={`inline-flex p-2 rounded-lg ${k.bg} ${k.color} mb-2`}>
-                  <k.icon className="w-4 h-4" />
-                </div>
-                <p className="text-2xl font-bold text-gray-900 leading-tight">{k.value}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{k.label}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+      {/* Primary KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Link href="/assets">
+          <div className="bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">
+                <Package className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 leading-none">{totalAssets}</p>
+            <p className="text-sm text-gray-500 mt-1">Total Assets</p>
+          </div>
+        </Link>
+        <Link href="/assets?status=ACTIVE">
+          <div className="bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-lg bg-green-50 text-green-600 group-hover:bg-green-100 transition-colors">
+                <CheckCircle className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{activeRate}%</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 leading-none">{activeAssets}</p>
+            <p className="text-sm text-gray-500 mt-1">Active</p>
+          </div>
+        </Link>
+        <Link href="/reports/asset-register">
+          <div className="bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-lg bg-purple-50 text-purple-600 group-hover:bg-purple-100 transition-colors">
+                <IndianRupee className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900 leading-none">{fmt(grossBlockValue)}</p>
+            <p className="text-sm text-gray-500 mt-1">Gross Block</p>
+          </div>
+        </Link>
+        <Link href="/assets?status=IN_REPAIR">
+          <div className="bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-lg bg-orange-50 text-orange-600 group-hover:bg-orange-100 transition-colors">
+                <Wrench className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 leading-none">{inRepairAssets}</p>
+            <p className="text-sm text-gray-500 mt-1">In Repair</p>
+          </div>
+        </Link>
       </div>
 
-      {/* Asset utilisation mini bar */}
-      <Card>
-        <CardContent className="py-3 px-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-orange-500" />Asset Utilisation
-            </span>
-            <span className="text-xs text-gray-400">{activeRate}% active</span>
-          </div>
-          <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
-            <div className="bg-green-400 transition-all" style={{ width: `${totalAssets > 0 ? (activeAssets / totalAssets) * 100 : 0}%` }} title={`Active: ${activeAssets}`} />
-            <div className="bg-orange-400 transition-all" style={{ width: `${totalAssets > 0 ? (inRepairAssets / totalAssets) * 100 : 0}%` }} title={`In Repair: ${inRepairAssets}`} />
-            <div className="bg-yellow-300 transition-all" style={{ width: `${totalAssets > 0 ? (idleAssets / totalAssets) * 100 : 0}%` }} title={`Idle: ${idleAssets}`} />
-            <div className="bg-gray-200 flex-1 transition-all" title={`Retired/Other: ${retiredAssets + procuredAssets}`} />
-          </div>
-          <div className="flex gap-4 mt-1.5 text-xs text-gray-400">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" />Active</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />In Repair</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-300 inline-block" />Idle</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-200 inline-block" />Other</span>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Status utilisation bar */}
+      <div className="bg-white border rounded-xl px-4 py-3.5">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-xs font-semibold text-gray-600">Asset Status Breakdown</span>
+          <span className="text-xs text-gray-400">{totalAssets} total</span>
+        </div>
+        <div className="flex h-2 rounded-full overflow-hidden gap-0.5">
+          <div className="bg-green-400" style={{ width: `${totalAssets > 0 ? (activeAssets / totalAssets) * 100 : 0}%` }} title={`Active: ${activeAssets}`} />
+          <div className="bg-orange-400" style={{ width: `${totalAssets > 0 ? (inRepairAssets / totalAssets) * 100 : 0}%` }} title={`In Repair: ${inRepairAssets}`} />
+          <div className="bg-yellow-300" style={{ width: `${totalAssets > 0 ? (idleAssets / totalAssets) * 100 : 0}%` }} title={`Idle: ${idleAssets}`} />
+          <div className="bg-gray-200 flex-1" title={`Other (retired, in transit, etc.): ${otherAssets}`} />
+        </div>
+        <div className="flex gap-4 mt-2 text-xs text-gray-400">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" />Active ({activeAssets})</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />In Repair ({inRepairAssets})</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-300 inline-block" />Idle ({idleAssets})</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-200 inline-block" />Other ({otherAssets})</span>
+        </div>
+      </div>
 
-      {/* Operational widgets */}
+      {/* Operational alerts row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Link href="/purchase-orders">
-          <Card className="border-l-4 border-l-indigo-500 hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-4">
-              <div className="inline-flex p-2 rounded-lg bg-indigo-50 text-indigo-600 mb-2">
-                <ShoppingCart className="w-4 h-4" />
-              </div>
-              <p className="text-2xl font-bold text-gray-900 leading-tight">{openPOs}</p>
-              <p className="text-xs text-gray-500 mt-0.5">Open Purchase Orders</p>
-            </CardContent>
-          </Card>
+          <div className="bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group border-l-4 border-l-indigo-400">
+            <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 inline-flex mb-2 group-hover:bg-indigo-100 transition-colors">
+              <ShoppingCart className="w-4 h-4" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900 leading-none">{openPOs}</p>
+            <p className="text-xs text-gray-500 mt-1">Open Purchase Orders</p>
+          </div>
         </Link>
         <Link href="/assets?status=RETIRED">
-          <Card className="border-l-4 border-l-red-500 hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-4">
-              <div className="inline-flex p-2 rounded-lg bg-red-50 text-red-600 mb-2">
-                <Trash2 className="w-4 h-4" />
-              </div>
-              <p className="text-2xl font-bold text-gray-900 leading-tight">{pendingDisposal}</p>
-              <p className="text-xs text-gray-500 mt-0.5">Pending Disposal Approval</p>
-            </CardContent>
-          </Card>
+          <div className="bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group border-l-4 border-l-red-400">
+            <div className="p-2 rounded-lg bg-red-50 text-red-600 inline-flex mb-2 group-hover:bg-red-100 transition-colors">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900 leading-none">{pendingDisposal}</p>
+            <p className="text-xs text-gray-500 mt-1">Pending Disposal</p>
+          </div>
         </Link>
         <Link href="/notifications">
-          <Card className="border-l-4 border-l-orange-500 hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-4">
-              <div className="inline-flex p-2 rounded-lg bg-orange-50 text-orange-600 mb-2">
-                <AlertTriangle className="w-4 h-4" />
-              </div>
-              <p className="text-2xl font-bold text-gray-900 leading-tight">{overdueSchedules}</p>
-              <p className="text-xs text-gray-500 mt-0.5">Overdue Maintenance Schedules</p>
-            </CardContent>
-          </Card>
+          <div className={`bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group border-l-4 ${overdueSchedules > 0 ? "border-l-orange-500" : "border-l-gray-200"}`}>
+            <div className={`p-2 rounded-lg inline-flex mb-2 transition-colors ${overdueSchedules > 0 ? "bg-orange-50 text-orange-600 group-hover:bg-orange-100" : "bg-gray-50 text-gray-400"}`}>
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900 leading-none">{overdueSchedules}</p>
+            <p className="text-xs text-gray-500 mt-1">Overdue Maintenance</p>
+          </div>
         </Link>
         <Link href="/notifications">
-          <Card className="border-l-4 border-l-yellow-500 hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-4">
-              <div className="inline-flex p-2 rounded-lg bg-yellow-50 text-yellow-600 mb-2">
-                <ShieldAlert className="w-4 h-4" />
-              </div>
-              <p className="text-2xl font-bold text-gray-900 leading-tight">{warrantyExpiring}</p>
-              <p className="text-xs text-gray-500 mt-0.5">Warranty Expiring This Month</p>
-            </CardContent>
-          </Card>
+          <div className={`bg-white border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer group border-l-4 ${warrantyExpiring > 0 ? "border-l-yellow-500" : "border-l-gray-200"}`}>
+            <div className={`p-2 rounded-lg inline-flex mb-2 transition-colors ${warrantyExpiring > 0 ? "bg-yellow-50 text-yellow-600 group-hover:bg-yellow-100" : "bg-gray-50 text-gray-400"}`}>
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900 leading-none">{warrantyExpiring}</p>
+            <p className="text-xs text-gray-500 mt-1">Warranty Expiring</p>
+          </div>
         </Link>
       </div>
 
-      {/* Charts row */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <GroupedBarChart data={groupChartData} />

@@ -6,15 +6,16 @@ import { Select, SelectContent, SelectDisplay, SelectItem, SelectTrigger } from 
 import { Filter, X } from "lucide-react";
 
 interface FilterOption { id: string; name: string; }
+interface ItActBlockOption { id: string; name: string; code: string; }
 
 interface Props {
-  categories: FilterOption[];
+  itActBlocks: ItActBlockOption[];
   locations: FilterOption[];
   suppliers?: FilterOption[];
   users?: FilterOption[];
   statuses?: string[];
   current: {
-    categoryId?: string;
+    itActBlockId?: string;
     locationId?: string;
     supplierId?: string;
     userId?: string;
@@ -22,7 +23,7 @@ interface Props {
   };
 }
 
-export function ReportFilters({ categories, locations, suppliers, users, statuses, current }: Props) {
+export function ReportFilters({ itActBlocks, locations, suppliers, users, statuses, current }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -39,11 +40,11 @@ export function ReportFilters({ categories, locations, suppliers, users, statuse
 
   function clear() {
     const params = new URLSearchParams(searchParams.toString());
-    ["categoryId", "locationId", "supplierId", "userId", "status"].forEach(k => params.delete(k));
+    ["itActBlockId", "locationId", "supplierId", "userId", "status"].forEach(k => params.delete(k));
     router.push(`${pathname}?${params.toString()}`);
   }
 
-  const hasFilters = !!(current.categoryId || current.locationId || current.supplierId || current.userId || current.status);
+  const hasFilters = !!(current.itActBlockId || current.locationId || current.supplierId || current.userId || current.status);
 
   return (
     <div className="bg-white border rounded-xl px-4 py-3">
@@ -52,16 +53,16 @@ export function ReportFilters({ categories, locations, suppliers, users, statuse
           <Filter className="w-3.5 h-3.5" />Filters:
         </span>
 
-        {/* Category */}
-        <Select value={current.categoryId ?? ""} onValueChange={(v: string | null) => update("categoryId", v ?? "")}>
-          <SelectTrigger className="h-7 text-xs w-48">
-            <SelectDisplay value={current.categoryId ?? ""} placeholder="All Categories">
-              {current.categoryId ? categories.find(c => c.id === current.categoryId)?.name : undefined}
+        {/* IT Act Block */}
+        <Select value={current.itActBlockId ?? ""} onValueChange={(v: string | null) => update("itActBlockId", v ?? "")}>
+          <SelectTrigger className="h-7 text-xs w-52">
+            <SelectDisplay value={current.itActBlockId ?? ""} placeholder="All IT Act Blocks">
+              {current.itActBlockId ? itActBlocks.find(b => b.id === current.itActBlockId)?.name : undefined}
             </SelectDisplay>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All Categories</SelectItem>
-            {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            <SelectItem value="ALL">All IT Act Blocks</SelectItem>
+            {itActBlocks.map(b => <SelectItem key={b.id} value={b.id}>{b.code} — {b.name}</SelectItem>)}
           </SelectContent>
         </Select>
 
