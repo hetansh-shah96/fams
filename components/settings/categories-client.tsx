@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectDisplay, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { DeleteConfirmDialog } from "@/components/settings/delete-confirm-dialog";
 
 const CA_PRESETS = [
   { label: "Buildings – RCC Frame (Residential)",    group: "Buildings",                    life: 60, method: "SLM", intangible: false },
@@ -43,7 +44,9 @@ export function CategoriesClient() {
   const [editing, setEditing] = useState<CaCategory | null>(null);
   const [form, setForm] = useState<CaForm>(EMPTY);
   const [loading, setLoading] = useState(false);
-  const [confirm, setConfirm] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CaCategory | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -82,13 +85,19 @@ export function CategoriesClient() {
     finally { setLoading(false); }
   }
 
-  async function del(id: string) {
+  async function del() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
     try {
-      const res = await fetch("/api/settings/categories", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      const res = await fetch("/api/settings/categories", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: deleteTarget.id }) });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? "Failed");
-      toast.success("Category deleted"); setConfirm(null); load();
-    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Error"); }
+      if (!res.ok) { setDeleteError(d.error ?? "Failed"); return; }
+      toast.success("Category deleted");
+      setDeleteTarget(null);
+      load();
+    } catch { setDeleteError("Network error — please try again"); }
+    finally { setDeleting(false); }
   }
 
   const grouped = items.reduce<Record<string, CaCategory[]>>((a, c) => { const k = c.group ?? "— Ungrouped —"; (a[k] ??= []).push(c); return a; }, {});
@@ -141,17 +150,10 @@ export function CategoriesClient() {
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cat.isIntangible ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>{cat.isIntangible ? "Intangible" : "Tangible"}</span>
                         </td>
                         <td className="px-4 py-2.5">
-                          {confirm === cat.id ? (
-                            <div className="flex gap-1"><span className="text-xs text-gray-500">Delete?</span>
-                              <Button variant="destructive" size="sm" className="h-6 text-xs px-2" onClick={() => del(cat.id)}>Yes</Button>
-                              <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => setConfirm(null)}>No</Button>
-                            </div>
-                          ) : (
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => openEdit(cat)}><Pencil className="w-3.5 h-3.5" /></Button>
-                              <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600" onClick={() => setConfirm(cat.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                            </div>
-                          )}
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(cat)}><Pencil className="w-3.5 h-3.5" /></Button>
+                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600" onClick={() => { setDeleteTarget(cat); setDeleteError(null); }}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -222,6 +224,16 @@ export function CategoriesClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => { setDeleteTarget(null); setDeleteError(null); }}
+        onConfirm={del}
+        itemLabel={deleteTarget ? `${deleteTarget.name} (${deleteTarget.code})` : ""}
+        entityType="Category"
+        deleting={deleting}
+        error={deleteError}
+      />
     </div>
   );
 }

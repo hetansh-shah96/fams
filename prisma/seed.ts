@@ -187,14 +187,23 @@ const CA_CATEGORIES = [
 async function main() {
   console.log("Seeding…");
 
+  // ── Company ───────────────────────────────────────────────────────────────
+  const company = await prisma.company.upsert({
+    where: { code: "DEMO-CO" },
+    update: {},
+    create: { code: "DEMO-CO", name: "Demo Company Pvt. Ltd.", city: "Mumbai", state: "Maharashtra", country: "India" },
+  });
+
   // ── Locations ────────────────────────────────────────────────────────────
   const mumbai = await prisma.location.upsert({
-    where: { code: "MUM-HO" }, update: {},
-    create: { code: "MUM-HO", name: "Mumbai Head Office", city: "Mumbai", state: "Maharashtra", pincode: "400001" },
+    where: { code: "MUM-HO" },
+    update: { companyId: company.id },
+    create: { code: "MUM-HO", name: "Mumbai Head Office", city: "Mumbai", state: "Maharashtra", pincode: "400001", companyId: company.id },
   });
   const pune = await prisma.location.upsert({
-    where: { code: "PUNE-BR" }, update: {},
-    create: { code: "PUNE-BR", name: "Pune Branch", city: "Pune", state: "Maharashtra", pincode: "411001" },
+    where: { code: "PUNE-BR" },
+    update: { companyId: company.id },
+    create: { code: "PUNE-BR", name: "Pune Branch", city: "Pune", state: "Maharashtra", pincode: "411001", companyId: company.id },
   });
 
   // ── Departments ──────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 export interface FieldDef {
@@ -27,18 +27,22 @@ interface Props<T extends Record<string, unknown>> {
   canEdit?: boolean;
   canDelete?: boolean;
   getViewHref?: (item: T) => string;
+  getItemLabel?: (item: T) => string;
 }
 
 export function MasterCrud<T extends Record<string, unknown>>({
   title, items, fields, apiPath, onRefresh,
   canCreate = true, canEdit = true, canDelete = true, getViewHref,
+  getItemLabel,
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<T | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   function openCreate() { setEditing(null); setForm({}); setOpen(true); }
 
@@ -48,6 +52,17 @@ export function MasterCrud<T extends Record<string, unknown>>({
     fields.forEach(field => { f[field.key] = String(item[field.key] ?? ""); });
     setForm(f);
     setOpen(true);
+  }
+
+  function openDelete(item: T) {
+    setDeleteTarget(item);
+    setDeleteError(null);
+  }
+
+  function closeDelete() {
+    if (deleting) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
   }
 
   async function handleSave() {
@@ -73,23 +88,32 @@ export function MasterCrud<T extends Record<string, unknown>>({
     } finally { setLoading(false); }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete() {
+    if (!deleteTarget) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
       const res = await fetch(apiPath, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: deleteTarget.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to delete");
+      if (!res.ok) {
+        setDeleteError(data.error ?? "Failed to delete");
+        return;
+      }
       toast.success("Deleted successfully");
-      setConfirmId(null);
+      setDeleteTarget(null);
       onRefresh();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Error");
+    } catch {
+      setDeleteError("Network error — please try again");
     } finally { setDeleting(false); }
   }
+
+  const itemLabel = deleteTarget
+    ? (getItemLabel ? getItemLabel(deleteTarget) : String(deleteTarget[fields[1]?.key ?? fields[0]?.key] ?? deleteTarget.id))
+    : "";
 
   return (
     <div className="space-y-4">
@@ -126,50 +150,29 @@ export function MasterCrud<T extends Record<string, unknown>>({
                   ))}
                   {(canEdit || canDelete || getViewHref) && (
                     <td className="px-4 py-3">
-                      {confirmId === String(item.id) ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-gray-500 mr-1">Delete?</span>
-                          <Button
-                            variant="destructive" size="sm"
-                            className="h-6 text-xs px-2"
-                            disabled={deleting}
-                            onClick={() => handleDelete(String(item.id))}
-                          >
-                            {deleting ? "…" : "Yes"}
-                          </Button>
-                          <Button
-                            variant="outline" size="sm"
-                            className="h-6 text-xs px-2"
-                            onClick={() => setConfirmId(null)}
-                          >
-                            No
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          {getViewHref && (
-                            <Link href={getViewHref(item)}>
-                              <Button variant="ghost" size="sm">
-                                <Eye className="w-3.5 h-3.5" />
-                              </Button>
-                            </Link>
-                          )}
-                          {canEdit && (
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>
-                              <Pencil className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-1">
+                        {getViewHref && (
+                          <Link href={getViewHref(item)}>
+                            <Button variant="ghost" size="sm">
+                              <Eye className="w-3.5 h-3.5" />
                             </Button>
-                          )}
-                          {canDelete && (
-                            <Button
-                              variant="ghost" size="sm"
-                              className="text-red-400 hover:text-red-600 hover:bg-red-50"
-                              onClick={() => setConfirmId(String(item.id))}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                          </Link>
+                        )}
+                        {canEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost" size="sm"
+                            className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => openDelete(item)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -179,6 +182,7 @@ export function MasterCrud<T extends Record<string, unknown>>({
         </table>
       </div>
 
+      {/* Edit / Create dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -200,6 +204,40 @@ export function MasterCrud<T extends Record<string, unknown>>({
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={loading} className="bg-orange-500 hover:bg-orange-600">
               {loading ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={closeDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Delete {title.replace(/s$/, "")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm text-gray-700">
+              You are about to permanently delete <span className="font-semibold">{itemLabel}</span>.
+              {" "}If other records (assets, users, departments) are linked to it, deletion will be blocked and you will see the details below.
+            </p>
+            {deleteError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex gap-3">
+                <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700 font-medium">{deleteError}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDelete} disabled={deleting}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting || !!deleteError}
+            >
+              {deleting ? "Deleting…" : "Yes, Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

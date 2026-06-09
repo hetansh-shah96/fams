@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Building2, Plus, Pencil, MapPin, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { DeleteConfirmDialog } from "@/components/settings/delete-confirm-dialog";
 
 interface Branch {
   id: string; code: string; name: string;
@@ -37,9 +38,10 @@ export function CompanyClient() {
   const [activeBrCompanyId, setActiveBrCompanyId] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
-  const [confirmBrId, setConfirmBrId] = useState<string | null>(null);
-  const [confirmCoId, setConfirmCoId] = useState<string | null>(null);
+  const [deleteCo, setDeleteCo] = useState<Company | null>(null);
+  const [deleteBr, setDeleteBr] = useState<Branch | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -86,37 +88,27 @@ export function CompanyClient() {
     setOpenBr(true);
   }
 
-  async function deleteBranch(id: string) {
-    setDeleting(true);
+  async function deleteBranch() {
+    if (!deleteBr) return;
+    setDeleting(true); setDeleteError(null);
     try {
-      const res = await fetch("/api/settings/locations", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      const res = await fetch("/api/settings/locations", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: deleteBr.id }) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed");
-      toast.success("Branch deleted");
-      setConfirmBrId(null);
-      load();
-    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Error"); }
+      if (!res.ok) { setDeleteError(data.error ?? "Failed"); return; }
+      toast.success("Branch deleted"); setDeleteBr(null); load();
+    } catch { setDeleteError("Network error — please try again"); }
     finally { setDeleting(false); }
   }
 
-  async function deleteCompany(id: string) {
-    setDeleting(true);
+  async function deleteCompany() {
+    if (!deleteCo) return;
+    setDeleting(true); setDeleteError(null);
     try {
-      const res = await fetch("/api/settings/company", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
+      const res = await fetch("/api/settings/company", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: deleteCo.id }) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed");
-      toast.success("Company deleted");
-      setConfirmCoId(null);
-      load();
-    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Error"); }
+      if (!res.ok) { setDeleteError(data.error ?? "Failed"); return; }
+      toast.success("Company deleted"); setDeleteCo(null); load();
+    } catch { setDeleteError("Network error — please try again"); }
     finally { setDeleting(false); }
   }
 
@@ -205,22 +197,12 @@ export function CompanyClient() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                {confirmCoId === co.id ? (
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500">Delete company?</span>
-                    <Button variant="destructive" size="sm" className="h-6 text-xs px-2" disabled={deleting} onClick={() => deleteCompany(co.id!)}>
-                      {deleting ? "…" : "Yes"}
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => setConfirmCoId(null)}>No</Button>
-                  </div>
-                ) : (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => openEditCo(co)}><Pencil className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => setConfirmCoId(co.id!)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </>
-                )}
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => openEditCo(co)}><Pencil className="w-3.5 h-3.5" /></Button>
+                  <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => { setDeleteCo(co); setDeleteError(null); }}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </>
                 <Button
                   variant="ghost" size="sm"
                   onClick={() => setExpanded(p => ({ ...p, [co.id ?? ""]: !p[co.id ?? ""] }))}
@@ -258,24 +240,14 @@ export function CompanyClient() {
                             </p>
                           </div>
                         </div>
-                        {confirmBrId === br.id ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-500">Delete?</span>
-                            <Button variant="destructive" size="sm" className="h-6 text-xs px-2" disabled={deleting} onClick={() => deleteBranch(br.id)}>
-                              {deleting ? "…" : "Yes"}
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => setConfirmBrId(null)}>No</Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEditBr({ ...br, companyId: co.id })}>
-                              <Pencil className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => setConfirmBrId(br.id)}>
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEditBr({ ...br, companyId: co.id })}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => { setDeleteBr(br); setDeleteError(null); }}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -361,6 +333,25 @@ export function CompanyClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!deleteCo}
+        onClose={() => { setDeleteCo(null); setDeleteError(null); }}
+        onConfirm={deleteCompany}
+        itemLabel={deleteCo ? `${deleteCo.name} (${deleteCo.code})` : ""}
+        entityType="Company"
+        deleting={deleting}
+        error={deleteError}
+      />
+      <DeleteConfirmDialog
+        open={!!deleteBr}
+        onClose={() => { setDeleteBr(null); setDeleteError(null); }}
+        onConfirm={deleteBranch}
+        itemLabel={deleteBr ? `${deleteBr.name} (${deleteBr.code})` : ""}
+        entityType="Branch"
+        deleting={deleting}
+        error={deleteError}
+      />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Info } from "lucide-react";
+import { DeleteConfirmDialog } from "@/components/settings/delete-confirm-dialog";
 
 interface ItBlock {
   id: string; code: string; name: string; rate: number;
@@ -22,7 +23,9 @@ export function ItActBlocksClient() {
   const [editing, setEditing] = useState<ItBlock | null>(null);
   const [form, setForm] = useState<ItForm>(EMPTY);
   const [loading, setLoading] = useState(false);
-  const [confirm, setConfirm] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ItBlock | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -54,13 +57,19 @@ export function ItActBlocksClient() {
     finally { setLoading(false); }
   }
 
-  async function del(id: string) {
+  async function del() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
     try {
-      const res = await fetch("/api/settings/it-act-blocks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      const res = await fetch("/api/settings/it-act-blocks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: deleteTarget.id }) });
       const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? "Failed");
-      toast.success("Block deleted"); setConfirm(null); load();
-    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Error"); }
+      if (!res.ok) { setDeleteError(d.error ?? "Failed"); return; }
+      toast.success("Block deleted");
+      setDeleteTarget(null);
+      load();
+    } catch { setDeleteError("Network error — please try again"); }
+    finally { setDeleting(false); }
   }
 
   const rate = Number(form.rate);
@@ -114,18 +123,10 @@ export function ItActBlocksClient() {
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500 max-w-xs">{b.description ?? "—"}</td>
                   <td className="px-4 py-3">
-                    {confirm === b.id ? (
-                      <div className="flex gap-1">
-                        <span className="text-xs text-gray-500">Delete?</span>
-                        <Button variant="destructive" size="sm" className="h-6 text-xs px-2" onClick={() => del(b.id)}>Yes</Button>
-                        <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => setConfirm(null)}>No</Button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(b)}><Pencil className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600" onClick={() => setConfirm(b.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                      </div>
-                    )}
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(b)}><Pencil className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-600" onClick={() => { setDeleteTarget(b); setDeleteError(null); }}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -164,6 +165,16 @@ export function ItActBlocksClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => { setDeleteTarget(null); setDeleteError(null); }}
+        onConfirm={del}
+        itemLabel={deleteTarget ? `${deleteTarget.name} (${deleteTarget.code})` : ""}
+        entityType="IT Act Block"
+        deleting={deleting}
+        error={deleteError}
+      />
     </div>
   );
 }
