@@ -76,7 +76,7 @@ export function CategoriesClient() {
       const res = await fetch("/api/settings/categories", {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(editing ? { id: editing.id } : {}), code: form.code.toUpperCase(), name: form.name, group: form.group || null, usefulLifeCompaniesAct: Number(form.life), depreciationMethod: form.method, assetClassDescription: form.desc || null, isIntangible: form.intangible, customFields: cf }),
+        body: JSON.stringify({ ...(editing ? { id: editing.id } : {}), code: form.code.toUpperCase(), name: form.name, group: form.group || null, usefulLifeCompaniesAct: Number(form.life), depreciationMethod: "WDV", assetClassDescription: form.desc || null, isIntangible: form.intangible, customFields: cf }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
       toast.success(editing ? "Category updated" : "Category created");
@@ -107,7 +107,7 @@ export function CategoriesClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">CA Categories</h1>
-          <p className="text-sm text-gray-500">Schedule II, Companies Act 2013 · Straight Line Method (SLM) · {items.length} categories</p>
+          <p className="text-sm text-gray-500">Schedule II, Companies Act 2013 · Written Down Value (WDV) · {items.length} categories</p>
         </div>
         <Button size="sm" className="bg-orange-500 hover:bg-orange-600" onClick={openCreate}>
           <Plus className="w-4 h-4 mr-2" />New Category
@@ -144,7 +144,7 @@ export function CategoriesClient() {
                         <td className="px-4 py-2.5"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{cat.code}</span></td>
                         <td className="px-4 py-2.5 text-center text-sm font-semibold text-orange-600">{cat.usefulLifeCompaniesAct} yrs</td>
                         <td className="px-4 py-2.5 text-center">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${cat.depreciationMethod === "SLM" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>{cat.depreciationMethod}</span>
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">WDV</span>
                         </td>
                         <td className="px-4 py-2.5 text-center">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cat.isIntangible ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>{cat.isIntangible ? "Intangible" : "Tangible"}</span>
@@ -195,13 +195,7 @@ export function CategoriesClient() {
             </div>
             <div className="space-y-1.5">
               <Label>Method</Label>
-              <Select value={form.method} onValueChange={(v: string | null) => { if (v) setForm(f => ({ ...f, method: v })); }}>
-                <SelectTrigger><SelectDisplay value={form.method}>{form.method === "SLM" ? "SLM – Straight Line" : "WDV – Written Down Value"}</SelectDisplay></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SLM">SLM – Straight Line Method</SelectItem>
-                  <SelectItem value="WDV">WDV – Written Down Value</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center h-9 px-3 rounded-md border bg-gray-50 text-sm text-purple-700 font-medium">WDV – Written Down Value</div>
             </div>
             <div className="col-span-2 flex items-center gap-2">
               <input type="checkbox" id="intangible" checked={form.intangible} onChange={e => setForm(f => ({ ...f, intangible: e.target.checked }))} className="w-4 h-4 accent-orange-500" />

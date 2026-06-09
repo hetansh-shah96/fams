@@ -44,10 +44,12 @@ export function calculateDepreciation(input: DepreciationInput): DepreciationRes
   const fyDays = getDaysBetween(fy.start, fy.end) + 1;
   const halfYearRule = putToUseDays < fyDays / 2;
 
-  // Companies Act SLM
-  const annualSLM = (purchaseCost - residualValue) / usefulLifeCompaniesAct;
-  const proRataSLM = (annualSLM * putToUseDays) / fyDays;
-  const companiesActDepreciation = Math.min(proRataSLM, openingWDV - residualValue);
+  // Companies Act WDV — rate derived from useful life: r = 1 - (SV/OC)^(1/n)
+  // Minimum scrap of 5% of cost prevents rate from approaching 100%
+  const safeResidual = Math.max(residualValue, purchaseCost * 0.05);
+  const caWDVRate = 1 - Math.pow(safeResidual / purchaseCost, 1 / usefulLifeCompaniesAct);
+  const rawCA = openingWDV * caWDVRate * (putToUseDays / fyDays);
+  const companiesActDepreciation = Math.max(0, Math.min(rawCA, openingWDV - residualValue));
   const companiesActClosingWDV = openingWDV - companiesActDepreciation;
 
   // IT Act WDV with 180-day rule

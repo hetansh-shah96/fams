@@ -468,14 +468,14 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="bg-orange-50 border border-orange-100 rounded px-2.5 py-1 text-orange-700 font-medium">
-                      CA: {asset.category.usefulLifeCompaniesAct} yrs {asset.category.depreciationMethod} · {(100 / asset.category.usefulLifeCompaniesAct).toFixed(2)}% p.a.
-                    </span>
                     {asset.itActBlock && (
                       <span className="bg-blue-50 border border-blue-100 rounded px-2.5 py-1 text-blue-700 font-medium">
                         IT Act: {(asset.itActBlock.rate * 100).toFixed(0)}% WDV · ½yr {(asset.itActBlock.rate * 50).toFixed(0)}%
                       </span>
                     )}
+                    <span className="bg-orange-50 border border-orange-100 rounded px-2.5 py-1 text-orange-700 font-medium">
+                      CA: {asset.category.usefulLifeCompaniesAct} yrs WDV
+                    </span>
                   </div>
                   <Link href={`/depreciation?assetId=${asset.id}`}>
                     <Button size="sm" variant="outline">
@@ -484,16 +484,16 @@ export function AssetDetailClient({ asset, canEdit }: { asset: Asset; canEdit: b
                   </Link>
                 </div>
 
-                <Tabs defaultValue="ca">
+                <Tabs defaultValue={asset.itActBlock ? "it" : "ca"}>
                   <TabsList variant="line">
-                    <TabsTrigger value="ca" className="text-xs px-3 py-1.5">
-                      Companies Act (SLM)
-                    </TabsTrigger>
                     {asset.itActBlock && (
                       <TabsTrigger value="it" className="text-xs px-3 py-1.5">
                         Income Tax Act (WDV)
                       </TabsTrigger>
                     )}
+                    <TabsTrigger value="ca" className="text-xs px-3 py-1.5">
+                      Companies Act (WDV)
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="ca">
